@@ -1,0 +1,16 @@
+services:
+  enduser:
+    build: .
+    container_name: halimbehesht-enduser
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3004
+      # سمت سرور (SSR داخل کانتینر) به بک‌اند روی host وصل می‌شود
+      API_URL: http://host.docker.internal:3003
+      # سمت مرورگر کاربر به localhost وصل می‌شود
+      API_URL_BROWSER: http://85.198.13.168:3003
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3004:3004"
