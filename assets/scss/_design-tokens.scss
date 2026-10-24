@@ -1,0 +1,160 @@
+/* =============================================================================
+   DESIGN TOKENS — the single file that defines the visual language.
+   =============================================================================
+
+   To switch the whole app to a different design, replace ONLY this file
+   (and its twin in the admin panel). Nothing else hard-codes a colour, a
+   radius, a shadow or a type size: every component reads these variables.
+
+   Current design: "Shop" — floating cards on a near-white canvas, pillow-soft
+   radii, hairline borders, dual-layer soft shadows, one saturated accent.
+   The accent is the Laviz pink rather than Shop's violet, on request.
+
+   Rules that keep a swap to one file:
+     • never write a hex value outside this file
+     • never write a px radius, shadow or font-size outside this file
+     • components use --lz-* variables only
+     • --laviz-* names are kept as aliases so existing markup keeps working
+   ============================================================================= */
+
+:root {
+  /* ---- Accent ------------------------------------------------------------
+     The system's only saturated colour. It carries identity and action:
+     primary buttons, the active tab underline, badges, the add control. */
+  --lz-accent: #e20074;
+  --lz-accent-strong: #bc0060;   /* pressed / text on tinted surfaces */
+  --lz-accent-deep: #9a004d;
+  --lz-accent-wash: #ffedf6;     /* tinted surface behind accent content */
+  --lz-accent-halo: rgba(226, 0, 116, 0.34); /* tint for the accent's shadow */
+
+  /* ---- Canvas & surfaces -------------------------------------------------
+     Shop separates layers with shadow on white, not with borders. */
+  --lz-canvas: #f2f4f5;
+  --lz-surface: #ffffff;
+  --lz-surface-soft: #eeeef0;
+  --lz-surface-light: #f6f6f6;
+
+  /* ---- Ink --------------------------------------------------------------- */
+  --lz-ink: #030306;
+  --lz-ink-muted: #575863;
+  --lz-ink-faint: #a6a8b0;
+  --lz-ink-inverse: #ffffff;
+
+  /* ---- Lines ------------------------------------------------------------- */
+  --lz-border: #d5d8df;
+  --lz-border-hairline: #ebebeb;
+
+  /* ---- Feedback ---------------------------------------------------------- */
+  --lz-success: #00843d;
+  --lz-success-wash: #eaf8ef;
+  --lz-danger: #e01d1d;
+  --lz-danger-wash: #fff0ee;
+  --lz-warning: #d47a0b;
+  --lz-warning-wash: #fff1e8;
+  --lz-star: #ffc700;
+
+  /* ---- Radii -------------------------------------------------------------
+     The generous rounding is the signature of this design. */
+  --lz-radius-card: 28px;
+  --lz-radius-media: 20px;   /* always ~8px tighter than the card it sits in */
+  --lz-radius-panel: 20px;
+  --lz-radius-control: 12px;
+  --lz-radius-chip: 9999px;
+  --lz-radius-pill: 9999px;
+
+  /* ---- Elevation ---------------------------------------------------------
+     Dual-layer soft shadows; never a single hard one. */
+  --lz-shadow-chip: rgba(0, 0, 0, 0.06) 0 2px 8px 0;
+  --lz-shadow-card: rgba(0, 0, 0, 0.1) 0 4px 6px -1px, rgba(0, 0, 0, 0.1) 0 2px 4px -2px;
+  --lz-shadow-float: rgba(0, 0, 0, 0.12) 0 4px 24px 0;
+  --lz-shadow-accent: var(--lz-accent-halo) 0 4px 24px 0;
+  --lz-shadow-bar: rgba(0, 0, 0, 0.12) 0 -4px 24px 0;
+
+  /* ---- Type --------------------------------------------------------------
+     Hierarchy comes from size and negative tracking, not heavy weights.
+     Persian faces are listed first: iranSansX matches the reference, and
+     the bundled YekanBakh is the fallback that actually ships. */
+  --lz-font: iranSansX, YekanBakh, Vazirmatn, Tahoma, ui-sans-serif, system-ui, sans-serif;
+
+  --lz-text-caption: 11px;
+  --lz-text-sm: 12px;
+  --lz-text-body: 14px;
+  --lz-text-lg: 16px;
+  --lz-text-display: 20px;
+
+  --lz-leading-tight: 1.33;
+  --lz-leading-body: 1.7;
+
+  --lz-track-display: -0.05em;
+  --lz-track-lg: -0.031em;
+  --lz-track-body: -0.014em;
+  --lz-track-sm: -0.017em;
+
+  --lz-weight-regular: 400;
+  --lz-weight-medium: 500;
+  --lz-weight-semibold: 600;
+
+  /* ---- Spacing ----------------------------------------------------------- */
+  --lz-space-1: 4px;
+  --lz-space-2: 8px;
+  --lz-space-3: 12px;
+  --lz-space-4: 16px;
+  --lz-space-5: 20px;
+  --lz-space-6: 24px;
+  --lz-space-8: 32px;
+  --lz-space-10: 40px;
+  --lz-space-12: 48px;
+  --lz-space-16: 64px;
+
+  /* ---- Layout ------------------------------------------------------------ */
+  --lz-page-max: 1200px;
+  --lz-section-gap: 64px;
+  --lz-element-gap: 12px;
+  --lz-control-h: 40px;
+  --lz-control-h-sm: 32px;
+
+  /* =========================================================================
+     COMPATIBILITY ALIASES
+     Existing markup refers to --laviz-*. Mapping them here means the whole
+     app follows the tokens above without touching every component, and a
+     future design swap still only edits this file.
+     ========================================================================= */
+  --laviz-primary: var(--lz-accent);
+  --laviz-primary-dark: var(--lz-accent-deep);
+  --laviz-primary-light: var(--lz-accent-wash);
+  --laviz-accent: var(--lz-accent);
+  --laviz-add-bg: var(--lz-accent-wash);
+  --laviz-add-ink: var(--lz-accent-strong);
+
+  --laviz-bg: var(--lz-surface);
+  --laviz-surface: var(--lz-surface);
+  --laviz-surface-light: var(--lz-surface-light);
+  --laviz-surface-soft: var(--lz-surface-soft);
+
+  --laviz-text: var(--lz-ink);
+  --laviz-muted: var(--lz-ink-muted);
+  --laviz-faint: var(--lz-ink-faint);
+
+  --laviz-border: var(--lz-border);
+  --laviz-border-light: var(--lz-border-hairline);
+
+  --laviz-shadow: var(--lz-shadow-card);
+  --laviz-shadow-sm: var(--lz-shadow-chip);
+
+  --laviz-radius: var(--lz-radius-panel);
+  --laviz-radius-sm: var(--lz-radius-control);
+
+  --laviz-success: var(--lz-success);
+  --laviz-danger: var(--lz-danger);
+}
+
+/* Ramadan keeps its own seasonal identity; only the accent family shifts, the
+   shape and elevation language above is unchanged. */
+.laviz-app--ramadan,
+html[data-laviz-mode='ramadan'] {
+  --lz-accent: #1b7a54;
+  --lz-accent-strong: #146142;
+  --lz-accent-deep: #0f4d35;
+  --lz-accent-wash: #e3f2ea;
+  --lz-accent-halo: rgba(27, 122, 84, 0.34);
+}

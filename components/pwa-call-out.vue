@@ -7,8 +7,7 @@
           <img src="/logo.png" class="pwa-call-out__logo">
         </div>
         <div class="col-12 text-center mt-3">
-          <h2 class="h5 pr-4 pl-4" style="line-height: 35px">اپ لاویز را به صفحه اصلی گوشی خود اضافه نمایید.
-          </h2>
+          <h2 class="h5 pr-4 pl-4" style="line-height: 35px">{{ text }}</h2>
         </div>
         <div class="col-12 text-center mt-2">
           <p class="title-4">و براحتی در روزهای آینده ثبت سفارش نمایید.</p>
@@ -66,6 +65,10 @@
 <script>
 export default {
   name: "pwa-call-out",
+  props: {
+    /** Wording is set in the panel. */
+    text: { type: String, default: 'اپ لاویز را به صفحه اصلی گوشی خود اضافه نمایید.' },
+  },
   data() {
     return {
       installPopupPwaStatus: false,

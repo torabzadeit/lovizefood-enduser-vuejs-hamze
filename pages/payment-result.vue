@@ -52,11 +52,11 @@
     <div class="row">
       <div class="col-12 mt-2">
         <p>
-          آدرس: بلوار بسیج، بعد از سالن آزادی، میدان شهدا، خیابان بصیرت
-          مدیریت : تراب زاده مقدم
+          آدرس: {{ shopInfo.address }}
+          <span v-if="shopInfo.managerName">— مدیریت: {{ shopInfo.managerName }}</span>
         </p>
-        <p>تلفن : <a href="tel:+985632499000">05632499000</a></p>
-        <p>پشتیبانی : <a href="tel:+989155611540">09155611540</a></p>
+        <p v-if="shopInfo.phone">تلفن : <a :href="'tel:' + shopInfo.phone">{{ shopInfo.phone }}</a></p>
+        <p>پشتیبانی : <a :href="'tel:' + shopInfo.supportPhone">{{ shopInfo.supportPhone }}</a></p>
       </div>
     </div>
   </div>
@@ -68,6 +68,14 @@ export default {
   data() {
     return {
       paymentStatus: false,
+      // The gateway loads this page directly, so there is no menu request to
+      // read the shop details from; the menu caches them for us.
+      shopInfo: {
+        address: 'بلوار بسیج، بعد از سالن آزادی، میدان شهدا، خیابان بصیرت',
+        phone: '05632499000',
+        managerName: 'تراب‌زاده مقدم',
+        supportPhone: '09155611540',
+      },
       paymentDetail: {
         customerName: null,
         basketProductsDetail: null,
@@ -87,8 +95,24 @@ export default {
   async mounted() {
     // return;
     // let resp = await this.$axios.get("/api/enduser/payment");
-    if (this.$route.query.status == 1)
-      this.paymentStatus = true
+    try {
+      const cached = localStorage.getItem('shopInfo');
+      if (cached) this.shopInfo = { ...this.shopInfo, ...JSON.parse(cached) };
+    } catch (e) { /* fall back to the defaults above */ }
+
+    // The callback never redirects with status 1: a verified payment is handed
+    // straight to the kitchen as WaitingForRestaurantConfirmation (10), so the
+    // old `== 1` check showed "پرداخت ناموفق" for every successful payment.
+    // Mirrors OrdersReportStatusItems on the API.
+    const SUCCESS_STATUSES = [
+      1,  // PaymentSuccess
+      2,  // PaymentSuccessManual
+      4,  // Delivered
+      10, // WaitingForRestaurantConfirmation
+      12, // Preparing
+      13, // DeliveredToCourier
+    ];
+    this.paymentStatus = SUCCESS_STATUSES.includes(Number(this.$route.query.status));
 
     //   if (this.$route.query.customerName) this.paymentDetail.customerName = this.$route.query.customerName
     // if (this.$route.query.basketProductsDetail) this.paymentDetail.basketProductsDetail = this.$route.query.basketProductsDetail

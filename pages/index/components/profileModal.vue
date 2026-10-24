@@ -121,7 +121,7 @@
               <div><strong>شماره:</strong> {{ o.orderNumber || o.id.slice(0, 8) }}</div>
               <div><strong>وضعیت:</strong> {{ statusLabel(o.status) }}</div>
               <div>{{ formatDate(o.createDate) }}</div>
-              <div v-if="o.deliveryDate"><strong>تحویل:</strong> {{ o.deliveryDate }} {{ o.deliveryTime || '' }}</div>
+              <div v-if="o.deliveryDate"><strong>تحویل:</strong> {{ formatJalaliDate(o.deliveryDate) }} {{ o.deliveryTime || '' }}</div>
             </div>
             <button
               type="button"
@@ -129,7 +129,7 @@
               :disabled="downloadingReceiptId === o.id"
               @click="downloadReceipt(o)"
             >
-              {{ downloadingReceiptId === o.id ? '...' : 'دانلود PDF' }}
+              {{ downloadingReceiptId === o.id ? '...' : 'چاپ / ذخیره PDF' }}
             </button>
           </div>
 
@@ -208,12 +208,14 @@
 <script>
 import MapPicker from '~/components/MapPicker.vue';
 import { DEFAULT_MAP_CENTER } from '~/utils/mapir';
+import { openOrderReceiptForPrint } from '~/utils/orderReceipt';
+import { formatJalaliDate } from '~/utils/persianDate';
 
 export default {
   name: 'ProfileModal',
   components: { MapPicker },
   props: {
-    supportPhone: { type: String, default: '09155611540' },
+    supportPhone: { type: [String, Number], default: '' },
     mapCenter: { type: Object, default: () => ({ lat: DEFAULT_MAP_CENTER.lat, lng: DEFAULT_MAP_CENTER.lng }) },
   },
   data() {
@@ -337,27 +339,20 @@ export default {
     formatDate(d) {
       return new Date(d).toLocaleString('fa-IR');
     },
+    formatJalaliDate,
     formatNum(n) {
       return Number(n || 0).toLocaleString('fa-IR');
     },
     async downloadReceipt(order) {
       this.downloadingReceiptId = order.id;
       try {
-        const res = await this.$axios.get(`/api/enduser/profile/orders/${order.id}/receipt.pdf`, {
-          responseType: 'blob',
-        });
-        const blob = new Blob([res.data], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `receipt-${order.orderNumber || order.id.slice(0, 8)}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        await openOrderReceiptForPrint(this.$axios, order);
+        this.$bvToast.toast('از پنجرهٔ چاپ، گزینهٔ «ذخیره به‌صورت PDF» را انتخاب کنید.', { variant: 'info' });
       } catch (e) {
-        const msg = e.response?.data?.message || 'خطا در دانلود رسید';
-        this.$bvToast.toast(typeof msg === 'string' ? msg : 'خطا در دانلود رسید', { variant: 'danger' });
+        const msg = e.code === 'POPUP_BLOCKED'
+          ? 'برای نمایش رسید، بازشدن پنجرهٔ جدید را در مرورگر مجاز کنید.'
+          : e.response?.data?.message || 'خطا در آماده‌سازی رسید';
+        this.$bvToast.toast(typeof msg === 'string' ? msg : 'خطا در آماده‌سازی رسید', { variant: 'danger' });
       } finally {
         this.downloadingReceiptId = null;
       }

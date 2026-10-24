@@ -259,6 +259,10 @@ export default {
         this.map.on('click', (e) => {
           this.setMarker(e.latlng.lat, e.latlng.lng, true);
           this.emitPosition(e.latlng.lat, e.latlng.lng);
+          this.$bvToast.toast('موقعیت شما روی نقشه ثبت شد.', {
+            variant: 'success',
+            autoHideDelay: 1800,
+          });
         });
       }
 

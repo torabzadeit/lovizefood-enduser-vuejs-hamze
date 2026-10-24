@@ -1,13 +1,21 @@
 <template>
+  <div class="laviz-storefront-shell">
   <b-overlay
+    class="laviz-storefront-overlay"
     :show="loading"
     :z-index="999">
 
-    <div class="main-fixed-header laviz-app-header">
+    <div class="main-fixed-header laviz-app-header" :class="{ 'laviz-app-header--collapsed': headerCollapsed }">
       <div class="container">
         <div class="row">
 
-          <div class="col-md-12 laviz-app-header__brand">
+          <!-- Collapsed state: a single thin line with just the shop name, so
+               the menu keeps the screen once the customer starts browsing. -->
+          <div v-if="headerCollapsed" class="col-12 laviz-app-header__compact">
+            <span class="laviz-app-header__compact-title">رستوران لاویز</span>
+          </div>
+
+          <div v-if="!headerCollapsed" class="col-md-12 laviz-app-header__brand">
             <img src="@/assets/media/logo.png" class="laviz-app-header__logo" alt="لاویز"/>
             <h1 class="laviz-app-header__title">رستوران لاویز</h1>
             <span v-if="mode === 0" class="laviz-mode-ribbon">🌙 ماه مبارک رمضان</span>
@@ -18,11 +26,16 @@
           </div>
 
           <div class="col-md-12">
-            <div class="laviz-user-bar" v-if="auth.is_login">
-              <span>{{ auth.user.first_name + " " + auth.user.last_name }} عزیز، خوش آمدید</span>
+            <div class="laviz-user-bar">
+              <span v-if="auth.is_login">{{ auth.user.first_name + " " + auth.user.last_name }} عزیز، خوش آمدید</span>
+              <span v-else>برای مشاهدهٔ پروفایل وارد حساب خود شوید</span>
               <span class="laviz-user-bar__actions">
-                <a href="#" @click.prevent="$refs.profileModal.open()">پروفایل</a>
-                <a href="#" @click.prevent="logout()">خروج</a>
+                <!-- ROLLBACK[profile-modal-link]: the profile modal was replaced by
+                     the /profile page. Restore this line to bring it back.
+                <a href="#" @click.prevent="$refs.profileModal.open()">پروفایل</a> -->
+                <a v-if="auth.is_login" href="#" @click.prevent="$router.push('/profile')">پروفایل</a>
+                <a v-else href="#" @click.prevent="openProfileLogin">ورود به پروفایل</a>
+                <a v-if="auth.is_login" href="#" @click.prevent="logout()">خروج</a>
               </span>
             </div>
             <div v-if="currentOrder" class="laviz-status-card laviz-status-card--expandable">
@@ -37,7 +50,7 @@
               </div>
               <div v-if="showCurrentOrderDetails" class="laviz-status-card__details mt-2 pt-2 border-top small">
                 <div>شماره: {{ currentOrder.orderNumber || currentOrder.id.slice(0, 8) }}</div>
-                <div>تحویل: {{ currentOrder.deliveryDate }} {{ currentOrder.deliveryTime || '' }}</div>
+                <div>تحویل: {{ formatJalaliDate(currentOrder.deliveryDate) }} {{ currentOrder.deliveryTime || '' }}</div>
                 <div v-if="currentOrder.deliveryAddress">آدرس: {{ currentOrder.deliveryAddress }}</div>
                 <div v-if="currentOrder.comment">توضیحات: {{ currentOrder.comment }}</div>
                 <div v-for="(item, idx) in currentOrderItems" :key="idx" class="d-flex justify-content-between">
@@ -54,36 +67,64 @@
                   :disabled="downloadingReceiptId === currentOrder.id"
                   @click="downloadReceipt(currentOrder)"
                 >
-                  {{ downloadingReceiptId === currentOrder.id ? '...' : 'دانلود PDF رسید' }}
+                  {{ downloadingReceiptId === currentOrder.id ? '...' : 'چاپ / ذخیره PDF رسید' }}
                 </button>
               </div>
             </div>
           </div>
 
-          <div class="col-12 laviz-tabs">
-            <b-tabs 
-              content-class="mt-2" v-model="tabIndex"
-              v-if="showCategoryTabs"
-            >
-              <b-tab
-                v-for="productCategoryItem in productCategories"
-                v-if="products.filter(x=> x['categoryId'] === productCategoryItem.id).length > 0"
-                :title="productCategoryItem.text"
-                :key="productCategoryItem.id">
+          <div v-if="!headerCollapsed" class="col-12">
+            <delivery-type-bar
+              v-model="delivery_type"
+              :options="deliveryTypeOptions"
+              :shippingCost="shippingCost"
+              :etaMinutes="etaMinutes"
+              :deliveryEtaLabel="labels.deliveryEta"
+              :pickupEtaLabel="labels.pickupEta"
+              :shippingChipLabel="labels.shippingChip"
+            />
+          </div>
 
-              </b-tab>
-            </b-tabs>
+          <div class="col-12 laviz-tabs laviz-tabs--bleed">
+            <!-- ROLLBACK[b-tabs-strip]: the previous b-tabs strip switched the
+                 content area one category at a time. The menu is now a single
+                 continuous scroll, so the strip only reflects/drives scroll
+                 position. Restore by reverting this block and the
+                 `menu-section` loop below. -->
+            <menu-category-nav
+              v-if="showCategoryTabs"
+              :categories="menuNavCategories"
+              :activeId="currentActiveTabId"
+              @select="scrollToCategory"
+              @open-sheet="menuSheetVisible = true"
+              @open-search="openSearch"
+            />
+
+            <div v-if="searchOpen" class="laviz-menu-search">
+              <input
+                ref="menuSearch"
+                v-model="menuSearch"
+                type="search"
+                class="laviz-menu-search__input"
+                placeholder="جستجوی غذا…"
+                @keyup.esc="closeSearch"
+              />
+              <button type="button" class="laviz-menu-search__close" aria-label="بستن جستجو" @click="closeSearch">✕</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
     <div class="container">
 
-      <div class="header-spacer"
-          :class="{ 'header-spacer--expanded': showCategoryTabs }"
-      ></div>
+      <!-- Reserves exactly the header's current height: it collapses on
+           scroll, so a fixed value left a gap under the tab strip. -->
+      <div class="header-spacer" :style="{ height: headerHeight + 'px' }"></div>
 
-      <section v-if="weeklyPlan.length" class="laviz-section laviz-weekly-plan mb-3">
+      <!-- ROLLBACK[weekly-plan-table]: replaced by the "غذای روز سرآشپز" tab
+           (chefDailyTab.vue). To go back to the old weekly table, delete the
+           `false &&` below and remove the chef-daily tab from the tab strip. -->
+      <section v-if="false && weeklyPlan.length" class="laviz-section laviz-weekly-plan mb-3">
         <div class="laviz-weekly-plan__header">
           <h2 class="laviz-weekly-plan__title">برنامه غذایی هفته</h2>
           <p class="laviz-weekly-plan__hint">منوی هر روز — غذاهای ثابت به‌اضافهٔ ویژهٔ همان روز</p>
@@ -124,17 +165,41 @@
             در حال حاضر محصولی برای این حالت ({{ mode === 0 ? 'رمضان' : 'عادی' }}) تعریف نشده است.
             لطفاً از پنل مدیریت، منوی {{ mode === 0 ? 'رمضان' : 'عادی' }} را تکمیل کنید.
           </div>
+          <discount-section
+            :personalCodes="myActiveCodes"
+            :publicOffers="publicOffers"
+          />
+
           <div class="product-content-wrapper">
 
+            <section
+              v-if="hasChefDaily"
+              :id="'menu-cat-' + CHEF_TAB_ID"
+              class="menu-section menu-section--chef-daily"
+            >
+              <chef-daily-tab
+                :products="chefDailyProducts"
+                :product-data="productData"
+                @increase="addChefDailyProduct"
+                @decrease="subChefDailyProduct"
+                @imageClick="showImageModal"
+              />
+            </section>
+
+            <!-- Every category is rendered as its own section in one long
+                 scroll (Snappfood layout); the strip above follows the scroll
+                 position rather than swapping the content. -->
             <template v-for="productCategoryItem in visibleCategories">
-              <div
-                v-if="!showCategoryTabs || productCategoryItem.id === currentActiveTabId"
+              <section
+                :id="'menu-cat-' + productCategoryItem.id"
+                :ref="'section-' + productCategoryItem.id"
                 :key="'content-' + productCategoryItem.id"
-                class="tab-content-container"
+                class="menu-section"
               >
+                <h2 class="menu-section__title">{{ productCategoryItem.text }}</h2>
                 <div
+                  v-for="product of categoryProducts(productCategoryItem.id)"
                   class="order-item"
-                  v-for="product of products.filter(x=> x['categoryId'] === productCategoryItem.id)"
                   :key="product.name"
                 >
                   <template v-if="productData[product.key]">
@@ -149,18 +214,50 @@
                       :description="productData[product.key].description"
                       :isSpecial="productData[product.key].isSpecial"
                       :specialDaysText="productData[product.key].specialDaysText"
+                      :ratingAverage="productData[product.key].ratingAverage"
+                      :ratingCount="productData[product.key].ratingCount"
+                      :showRating="showProductRating"
                       @decrease="subProductCount(product.key,productData[product.key].add_unit)"
                       @increase="addProductCount(product.key,productData[product.key].add_unit)"
                       @imageClick="showImageModal"
                     />
                   </template>
                 </div>
-              </div>
+              </section>
             </template>
           </div>
         </div>
 
 
+        <!-- Step 2: a full-screen sheet opened from the basket button. It holds
+             the same delivery / address / invoice sections as before, so the
+             information collected from the customer is unchanged. -->
+        <div class="laviz-cart-modal" v-if="cartOpen">
+        <div class="laviz-cart-modal__bar">
+          <button type="button" class="laviz-cart-modal__close" aria-label="بستن" @click="closeCart">✕</button>
+          <h2 class="laviz-cart-modal__title">سبد خرید</h2>
+          <span class="laviz-cart-modal__count">{{ selectedProducts.length }} قلم</span>
+        </div>
+
+        <div class="laviz-cart-modal__scroll">
+        <section class="laviz-section laviz-cart-items">
+          <h3 class="laviz-section__title">اقلام سفارش</h3>
+          <div v-for="item in selectedProducts" :key="item.key" class="laviz-cart-line">
+            <div class="laviz-cart-line__info">
+              <span class="laviz-cart-line__name">{{ item.name }}</span>
+              <small class="laviz-cart-line__unit">{{ item.count }} {{ item.unit_name }}</small>
+            </div>
+            <div class="laviz-cart-line__stepper">
+              <button type="button" @click="subProductCount(item.key, productData[item.key].add_unit)" aria-label="کم کردن">−</button>
+              <span>{{ item.count }}</span>
+              <button type="button" @click="addProductCount(item.key, productData[item.key].add_unit)" aria-label="افزودن">+</button>
+            </div>
+            <span class="laviz-cart-line__price">{{ formatNum(item.total) }} تومان</span>
+          </div>
+          <p v-if="!selectedProducts.length" class="laviz-cart-items__empty">سبد خرید خالی است.</p>
+        </section>
+
+        <div class="laviz-checkout-details">
         <div class="col-md-12 mt-2">
           <section class="laviz-section">
             <h2 class="laviz-section__title">
@@ -219,12 +316,14 @@
                     {{ deliveryItem.discount_percent }}٪ تخفیف
                   </span>
                 </span>
+                    <!-- Only the first card is "today"; the others are closed
+                         days, so the wording has to follow the index. -->
                     <div
                       class="text-muted mr-1"
                       style="font-size: 13px"
                       v-if="!deliveryItem.status"
                     >
-                      سفارش برای امروز به پایان رسیده
+                      {{ deliveryIndex === 0 ? 'سفارش برای امروز به پایان رسیده' : 'این روز تعطیل است' }}
                     </div>
                   </label>
                 </div>
@@ -279,7 +378,7 @@
 
               <div class="mt-3" v-if="delivery_type == 'iWillCome'">
                 <label class="form-label font-weight-bold">موقعیت رستوران (تحویل حضوری)</label>
-                <p class="text-muted small mb-2">{{ mapCenter.address || in_person_description }}</p>
+                <p class="text-muted small mb-2">{{ in_person_description || mapCenter.address }}</p>
                 <client-only>
                   <map-picker
                     ref="restaurantMap"
@@ -300,6 +399,9 @@
                 <label class="form-label font-weight-bold">آدرس تحویل</label>
                 <p class="text-muted small mb-2">
                   هزینه ارسال {{ formatNum(this.shippingCost) }} تومان به فاکتور اضافه می‌شود. ارسال فقط در محدوده شهر.
+                </p>
+                <p v-if="delivery_description" class="laviz-delivery-description mb-2">
+                  {{ delivery_description }}
                 </p>
                 <div v-if="savedAddresses.length" class="form-group laviz-saved-addresses">
                   <label class="small d-block mb-2">آدرس‌های ذخیره‌شده</label>
@@ -336,9 +438,6 @@
                     @address="onMapAddress"
                   />
                 </client-only>
-                <div class="mt-2 text-muted" style="font-size: 13px">
-                  {{ delivery_description }}
-                </div>
               </div>
             </div>
           </section>
@@ -350,8 +449,30 @@
               <span class="laviz-section__title-num">۲</span>
               کد تخفیف
             </h2>
-            <p class="laviz-discount-hint mb-2">
-              کد تخفیف ۱۰٪ Loviz برای اولین سفارش
+            <!-- Codes already issued to this customer. Selecting one fills the
+                 field; only one code can ever be on an invoice, so picking a
+                 second simply replaces the first. -->
+            <div v-if="myActiveCodes.length" class="laviz-my-codes">
+              <p class="laviz-my-codes__hint">کدهای تخفیف فعال شما:</p>
+              <div class="laviz-my-codes__list">
+                <button
+                  v-for="c in myActiveCodes"
+                  :key="c.id"
+                  type="button"
+                  class="laviz-my-code"
+                  :class="{ 'laviz-my-code--active': discountCode.code === c.code }"
+                  :disabled="discountCode.code_valid_status"
+                  @click="pickMyCode(c)"
+                >
+                  <span class="laviz-my-code__code">{{ c.code }}</span>
+                  <span class="laviz-my-code__amount">{{ formatNum(c.amount) }} تومان</span>
+                  <small class="laviz-my-code__exp">{{ remainingLabel(c) }}</small>
+                </button>
+              </div>
+            </div>
+
+            <p v-else class="laviz-discount-hint mb-2">
+              اگر کد تخفیف دارید اینجا وارد کنید.
             </p>
             <div class="laviz-discount-row">
               <input
@@ -421,7 +542,9 @@
       </div>
     </div>
   </div>  -->
-        <div class="col-md-12 mt-2">
+        <!-- HIDDEN[invoice-summary]: switched off on request. Delete the
+             `false &&` below to bring the card back. -->
+        <div v-if="false" class="col-md-12 mt-2">
           <section class="laviz-section">
             <h2 class="laviz-section__title">
               <span class="laviz-section__title-num">۳</span>
@@ -496,10 +619,39 @@
             </div>
           </section>
         </div>
-        
+        </div><!-- /laviz-checkout-details -->
+
+        </div><!-- /laviz-cart-modal__scroll -->
+
+        <!-- Payment is only offered once we know who the customer is; guests
+             are sent to the phone/OTP modal first and land back here. -->
+        <div class="laviz-cart-modal__cta">
+          <div class="laviz-cart-modal__total">
+            <small>مبلغ قابل پرداخت</small>
+            <strong>{{ formatNum(bill.payment_amount) }} تومان</strong>
+          </div>
+          <button
+            v-if="auth.is_login"
+            type="button"
+            class="laviz-btn-pay"
+            @click="order()"
+          >پرداخت و ثبت سفارش</button>
+          <button
+            v-else
+            type="button"
+            class="laviz-btn-pay"
+            @click="startLoginFromCart"
+          >ورود یا ثبت‌نام</button>
+        </div>
+        </div><!-- /laviz-cart-modal -->
+
       </div>
 
-      <div class="laviz-sticky-cta">
+      <!-- ROLLBACK[sticky-pay-cta]: the old always-on pay bar. The new flow
+           uses stickyContinueBar.vue (menu step) and shows this pay bar only
+           once the customer is in the details step. To restore the previous
+           behaviour, drop the v-if below and remove <sticky-continue-bar>. -->
+      <div class="laviz-sticky-cta" v-if="false">
         <div class="laviz-sticky-cta__inner">
           <div class="laviz-sticky-cta__price">
             <small>مبلغ قابل پرداخت</small>
@@ -511,23 +663,40 @@
         </div>
       </div>
 
+      <menu-sheet
+        :visible.sync="menuSheetVisible"
+        :categories="sheetCategories"
+        @select="scrollToCategory"
+      />
+
+      <sticky-continue-bar
+        v-if="!cartOpen"
+        :itemCount="selectedProducts.length"
+        :total="selectedItemsTotal"
+        :isLoggedIn="auth.is_login"
+        @continue="openCart"
+      />
+
+      <!-- Every line comes from the settings panel; the address and phone
+           numbers used to be three hardcoded copies across two pages. -->
       <footer class="laviz-footer container">
-        <p>بلوار بسیج، بعد از سالن آزادی، میدان شهدا، خیابان بصیرت</p>
-        <p class="small">مدیریت: تراب‌زاده مقدم</p>
-        <p>تلفن: <a href="tel:+985632499000">۰۵۶۳۲۴۹۹۰۰۰</a></p>
+        <p>{{ shopInfo.address }}</p>
+        <p v-if="shopInfo.managerName" class="small">مدیریت: {{ shopInfo.managerName }}</p>
+        <p v-if="shopInfo.phone">تلفن: <a :href="'tel:' + shopInfo.phone">{{ shopInfo.phone }}</a></p>
         <p>پشتیبانی: <a :href="'tel:' + supportPhone">{{ supportPhone }}</a></p>
         <a
-          class="d-inline-block mt-2"
+          v-if="enamad.id && enamad.code"
+          class="laviz-footer__seal d-inline-block mt-2"
           referrerpolicy="origin"
           target="_blank"
-          href="https://trustseal.enamad.ir/?id=318434&amp;Code=iRsYltasTth63EoObN3V"
+          :href="'https://trustseal.enamad.ir/?id=' + enamad.id + '&Code=' + enamad.code"
         >
           <img
             referrerpolicy="origin"
-            src="https://Trustseal.eNamad.ir/logo.aspx?id=318434&amp;Code=iRsYltasTth63EoObN3V"
+            :src="'https://Trustseal.eNamad.ir/logo.aspx?id=' + enamad.id + '&Code=' + enamad.code"
             alt="نماد اعتماد الکترونیک"
-            style="cursor: pointer; max-height: 72px;"
-            id="iRsYltasTth63EoObN3V"
+            style="cursor: pointer;"
+            :id="enamad.code"
           />
         </a>
       </footer>
@@ -537,6 +706,7 @@
       <register-modal
         @onRegister="registerSuccess"
         @onLogin="loginSuccess"
+        @closed="onLoginModalClosed"
         @order="order"
         :auth="auth"/>
       <bill-modal
@@ -563,10 +733,11 @@
         @addresses-changed="refreshSavedAddresses"
       />
       <image-details-modal :src="modal.image"/>
-      <pwa-call-out/>
+      <pwa-call-out :text="pwaCallOutText"/>
     </div>
 
   </b-overlay>
+  </div>
 </template>
 
 <script>
@@ -575,7 +746,6 @@ import moment from "moment-jalaali";
 // moment.locale('fa')
 import 'moment/locale/fa'  // برای فارسی
 moment.locale('fa')
-import fa from "moment/src/locale/fa";
 import PwaCallOut from "../components/pwa-call-out.vue";
 import SuccessLoginModal from "./index/components/successLoginModal.vue";
 import RegisterModal from "./index/components/registerModal.vue";
@@ -585,15 +755,29 @@ import ProductItem from "~/pages/index/components/productItem.vue";
 import ImageDetailsModal from "@/pages/index/components/image-details-modal.vue";
 import ProfileModal from "./index/components/profileModal.vue";
 import MapPicker from "~/components/MapPicker.vue";
+import MenuCategoryNav from "./index/components/menuCategoryNav.vue";
+import DeliveryTypeBar from "./index/components/deliveryTypeBar.vue";
+import MenuSheet from "./index/components/menuSheet.vue";
+import DiscountSection from "./index/components/discountSection.vue";
+import ChefDailyTab from "./index/components/chefDailyTab.vue";
+import StickyContinueBar from "./index/components/stickyContinueBar.vue";
 import { applyAppModeTheme } from "~/utils/appModeTheme";
 import { DEFAULT_MAP_CENTER } from "~/utils/mapir";
+import { openOrderReceiptForPrint } from "~/utils/orderReceipt";
+import { formatJalaliDate } from "~/utils/persianDate";
+import { isOrderScheduledForTodayOrLater } from "~/utils/orderScheduleDate";
+import restoreCustomerSession from "~/utils/customerSession.cjs";
+import { visibleDeliveryOptions, deliveryDayLabel } from "~/utils/deliveryOptions";
 
-moment.locale("fa", fa);
+// Sentinel id for the synthetic "غذای روز سرآشپز" tab. It is not a real
+// product_category row, so it must never collide with a uuid.
+const CHEF_TAB_ID = '__chef_daily__';
+
 moment.loadPersian(true, {dialect: "persian-modern"});
 
 export default {
   name: "index",
-  components: {ImageDetailsModal, ProductItem, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker},
+  components: {ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
   data() {
     return {
       modal: {
@@ -613,6 +797,17 @@ export default {
       downloadingReceiptId: null,
       showCurrentOrderDetails: false,
       supportPhone: '09155611540',
+      // Overwritten from /core/initialize; these are only what shows before
+      // the first response lands.
+      enamad: { id: '7875248', code: 'VIKq8FP3KkU7QRlCmSEIZgP8GD4wtPCC' },
+      pwaCallOutText: 'اپ لاویز را به صفحه اصلی گوشی خود اضافه نمایید.',
+      shopInfo: {
+        name: 'رستوران لاویز',
+        address: 'بلوار بسیج، بعد از سالن آزادی، میدان شهدا، خیابان بصیرت',
+        phone: '05632499000',
+        managerName: 'تراب‌زاده مقدم',
+        supportPhone: '09155611540',
+      },
       mapCenter: {
         lat: DEFAULT_MAP_CENTER.lat,
         lng: DEFAULT_MAP_CENTER.lng,
@@ -650,7 +845,8 @@ export default {
         decreased_amount: 0,
         payment_amount: 0,
       },
-      delivery_type: null,
+      // Pickup is the default order method unless settings hide it.
+      delivery_type: 'iWillCome',
       delivery_date: -1,
       delivery_time: null,
       check_one: false,
@@ -668,6 +864,31 @@ export default {
       sumInCurrentMenu: 0,
       tabIndex: 0,
       currentActiveTabId: null,
+      CHEF_TAB_ID,
+      // The basket sheet covers the screen; the menu stays mounted behind it.
+      cartOpen: false,
+      // Set when a guest pressed "ادامه" and still has to authenticate.
+      pendingContinue: false,
+      profileLoginPending: false,
+      // Scrollspy bookkeeping (not reactive UI state, but kept here so the
+      // component instance owns them and they are torn down with it).
+      menuSheetVisible: false,
+      headerCollapsed: false,
+      headerHeight: 264,
+      searchOpen: false,
+      menuSearch: '',
+      etaMinutes: 0,
+      showProductRating: false,
+      labels: {
+        deliveryEta: 'تحویل فوری تا {value} دقیقه',
+        pickupEta: 'آماده‌سازی تا {value} دقیقه',
+        shippingChip: 'ارسال: {value}',
+      },
+      myActiveCodes: [],
+      publicOffers: [],
+      suppressScrollSpy: false,
+      scrollSpyTimer: null,
+      scrollSpyFrame: null,
     };
   },
   created() {
@@ -702,17 +923,39 @@ export default {
 
 
     this.initialize();
-    let token = localStorage.getItem("token");
-    let user = localStorage.getItem("user");
-    if (token && user) {
-      this.auth.token = token;
-      this.auth.user = JSON.parse(user);
+    const session = restoreCustomerSession(localStorage, this.$axios);
+    if (session) {
+      this.auth.token = session.token;
+      this.auth.user = session.user;
       this.auth.is_login = true;
-      this.$axios.setHeader("Authorization", "Bearer " + token);
       this.loadCurrentOrder();
     }
+
+    this.$nextTick(this.syncHeaderHeight);
+    window.addEventListener('scroll', this.onMenuScroll, { passive: true });
+    window.addEventListener('resize', this.onMenuScroll, { passive: true });
+  },
+
+  beforeDestroy() {
+    if (process.client) document.body.style.overflow = '';
+    window.removeEventListener('scroll', this.onMenuScroll);
+    window.removeEventListener('resize', this.onMenuScroll);
+    clearTimeout(this.scrollSpyTimer);
+    if (this.scrollSpyFrame) cancelAnimationFrame(this.scrollSpyFrame);
   },
   methods: {
+    openProfileLogin() {
+      if (this.auth.is_login) {
+        this.$router.push('/profile');
+        return;
+      }
+      this.profileLoginPending = true;
+      this.$bvModal.show('modal-login');
+    },
+    onLoginModalClosed() {
+      // Closing the dialog must not turn a later checkout login into a profile redirect.
+      this.profileLoginPending = false;
+    },
     pickSavedAddress(addr) {
       this.selectedAddressId = addr.id;
       this.delivery_address = addr.address;
@@ -755,8 +998,11 @@ export default {
     },
     async loadCurrentOrder() {
       try {
-        const res = await this.$axios.get('/api/enduser/profile/orders/current');
-        if (res.data?.order) {
+        const res = await this.$axios.get('/api/enduser/profile/orders/current', {
+          params: { _refresh: Date.now() },
+          headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+        });
+        if (res.data?.order && isOrderScheduledForTodayOrLater(res.data.order)) {
           this.currentOrder = res.data.order;
           this.currentOrderItems = (res.data.items || []).map((i) => ({
             title: i.productTitle || 'محصول',
@@ -776,20 +1022,13 @@ export default {
       if (!order?.id) return;
       this.downloadingReceiptId = order.id;
       try {
-        const res = await this.$axios.get(`/api/enduser/profile/orders/${order.id}/receipt.pdf`, {
-          responseType: 'blob',
-        });
-        const blob = new Blob([res.data], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `receipt-${order.orderNumber || order.id.slice(0, 8)}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        await openOrderReceiptForPrint(this.$axios, order);
+        this.$bvToast.toast('از پنجرهٔ چاپ، گزینهٔ «ذخیره به‌صورت PDF» را انتخاب کنید.', { variant: 'info' });
       } catch (e) {
-        this.$bvToast.toast('خطا در دانلود رسید', { variant: 'danger' });
+        const message = e.code === 'POPUP_BLOCKED'
+          ? 'برای نمایش رسید، بازشدن پنجرهٔ جدید را در مرورگر مجاز کنید.'
+          : e.response?.data?.message || 'خطا در آماده‌سازی رسید';
+        this.$bvToast.toast(typeof message === 'string' ? message : 'خطا در آماده‌سازی رسید', { variant: 'danger' });
       } finally {
         this.downloadingReceiptId = null;
       }
@@ -799,13 +1038,157 @@ export default {
         return;
       this.delivery_date = index;
     },
+    openSearch() {
+      this.searchOpen = true;
+      this.$nextTick(() => this.$refs.menuSearch && this.$refs.menuSearch.focus());
+    },
+    closeSearch() {
+      this.searchOpen = false;
+      this.menuSearch = '';
+    },
+
+    // Chef's-daily foods live in their own weekly section, not in categories.
+    categoryProducts(categoryId) {
+      const q = (this.menuSearch || '').trim();
+      return this.products.filter(
+        (p) =>
+          p.categoryId === categoryId &&
+          p.menu_type !== 'specialDay' &&
+          (!q || (p.name || '').includes(q) || (p.description || '').includes(q))
+      );
+    },
+    addChefDailyProduct(productKey) {
+      const product = this.productData[productKey];
+      if (product) this.addProductCount(productKey, product.add_unit);
+    },
+    subChefDailyProduct(productKey) {
+      const product = this.productData[productKey];
+      if (product) this.subProductCount(productKey, product.add_unit);
+    },
+    async loadMyDiscountCodes() {
+      if (!this.auth.is_login) { this.myActiveCodes = []; return; }
+      try {
+        const { data } = await this.$axios.get('/api/enduser/profile/active-discount-codes');
+        this.myActiveCodes = data || [];
+      } catch (e) {
+        this.myActiveCodes = [];
+      }
+    },
+    pickMyCode(c) {
+      this.discountCode.code = c.code;
+      this.approveDiscountCode();
+    },
+    remainingLabel(c) {
+      if (c.remainingDays === null || c.remainingDays === undefined) return 'بدون محدودیت';
+      if (c.remainingDays === 0) return 'امروز آخرین مهلت';
+      if (c.remainingDays === 1) return 'یک روز مانده';
+      return `${c.remainingDays} روز مانده`;
+    },
+    openCart() {
+      if (!this.selectedProducts.length) return;
+      this.cartOpen = true;
+      this.loadMyDiscountCodes();
+      if (process.client) document.body.style.overflow = 'hidden';
+    },
+    closeCart() {
+      this.cartOpen = false;
+      if (process.client) document.body.style.overflow = '';
+    },
+    /** Guests: collect the phone number and OTP, then come back to the sheet. */
+    startLoginFromCart() {
+      this.pendingContinue = true;
+      this.$bvModal.show('modal-login');
+    },
+    advanceToDetails() {
+      // Called after a successful login/register: the basket sheet stays open
+      // and now shows the payment button instead of the login one.
+      this.pendingContinue = false;
+      this.cartOpen = true;
+      this.loadMyDiscountCodes();
+      if (process.client) document.body.style.overflow = 'hidden';
+    },
     handleTabChange(newTabIndex) {
-      const activeCategories = this.visibleCategories;
+      const activeCategories = this.menuNavCategories;
       if (activeCategories[newTabIndex]) {
         this.currentActiveTabId = activeCategories[newTabIndex].id;
       } else if (activeCategories[0]) {
         this.currentActiveTabId = activeCategories[0].id;
       }
+    },
+
+    // The fixed header covers the top of the viewport, so the "current"
+    // section is judged against a line just below it rather than against 0.
+    headerOffset() {
+      const header = document.querySelector('.main-fixed-header');
+      return (header ? header.offsetHeight : 0) + 12;
+    },
+
+    /** Keeps the spacer in step with the header as it collapses and expands. */
+    syncHeaderHeight() {
+      const header = document.querySelector('.main-fixed-header');
+      if (header && header.offsetHeight !== this.headerHeight) {
+        this.headerHeight = header.offsetHeight;
+      }
+    },
+
+    scrollToCategory(categoryId) {
+      const el = document.getElementById('menu-cat-' + categoryId);
+      if (!el) return;
+      // Highlight immediately, then let the scroll settle before the scroll
+      // handler takes over again — otherwise it fights the smooth animation.
+      this.currentActiveTabId = categoryId;
+      this.suppressScrollSpy = true;
+      const top = el.getBoundingClientRect().top + window.pageYOffset - this.headerOffset();
+      window.scrollTo({ top, behavior: 'smooth' });
+      clearTimeout(this.scrollSpyTimer);
+      this.scrollSpyTimer = setTimeout(() => {
+        this.suppressScrollSpy = false;
+      }, 700);
+    },
+
+    // Picks the last section whose top has passed under the header. Cheap and
+    // predictable; no observer thresholds to tune for short trailing sections.
+    updateActiveCategoryFromScroll() {
+      if (this.suppressScrollSpy || !this.menuNavCategories.length) return;
+
+      // getBoundingClientRect().top is fractional, so a section scrolled exactly
+      // to the line lands a fraction below it and would otherwise be skipped —
+      // leaving the strip one section behind. A small tolerance absorbs that.
+      const TOLERANCE_PX = 2;
+      const line = this.headerOffset() + TOLERANCE_PX;
+      let activeId = this.menuNavCategories[0].id;
+
+      for (const cat of this.menuNavCategories) {
+        const el = document.getElementById('menu-cat-' + cat.id);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top - line <= 0) activeId = cat.id;
+      }
+
+      // At the very bottom the last section may never reach the line, so make
+      // sure it still wins once the page is scrolled all the way down.
+      const atBottom =
+        window.innerHeight + window.pageYOffset >= document.body.scrollHeight - 2;
+      if (atBottom) activeId = this.menuNavCategories[this.menuNavCategories.length - 1].id;
+
+      if (activeId !== this.currentActiveTabId) this.currentActiveTabId = activeId;
+    },
+
+    onMenuScroll() {
+      if (this.scrollSpyFrame) return;
+      this.scrollSpyFrame = requestAnimationFrame(() => {
+        this.scrollSpyFrame = null;
+        this.updateActiveCategoryFromScroll();
+        this.updateHeaderCollapse();
+        this.$nextTick(this.syncHeaderHeight);
+      });
+    },
+
+    /** Collapse the header once the customer has scrolled past the brand block.
+     *  Hysteresis (80 down / 40 up) stops it flickering at the threshold. */
+    updateHeaderCollapse() {
+      const y = window.pageYOffset;
+      if (!this.headerCollapsed && y > 80) this.headerCollapsed = true;
+      else if (this.headerCollapsed && y < 40) this.headerCollapsed = false;
     },
     async initialize() {
       this.loading = true;
@@ -813,25 +1196,49 @@ export default {
         const resp = await this.$axios.get('/api/enduser/core/initialize');
         this.productCategories = resp.data.categories;
         this.products = resp.data.products;
-        this.deliveryItems = resp.data.schedule.activeDays;
+        this.deliveryItems = visibleDeliveryOptions(resp.data.schedule.activeDays);
+        if (Array.isArray(resp.data.deliveryTypeOptions) && resp.data.deliveryTypeOptions.length) {
+          this.deliveryTypeOptions = resp.data.deliveryTypeOptions;
+        }
+        if (!this.deliveryTypeOptions.some(option => option.value === this.delivery_type)) {
+          this.delivery_type = this.deliveryTypeOptions[0].value;
+        }
         this.shippingCost = resp.data.shippingCost;
         this.delivery_address = resp.data.address;
         if (resp.data.mapCenter) this.mapCenter = resp.data.mapCenter;
         if (resp.data.supportPhone) this.supportPhone = resp.data.supportPhone;
+        if (resp.data.pwaCallOutText) this.pwaCallOutText = resp.data.pwaCallOutText;
+        if (resp.data.shopInfo) {
+          this.shopInfo = { ...this.shopInfo, ...resp.data.shopInfo };
+          // Kept in localStorage so the result page, which the gateway loads
+          // directly without a menu request, can show the same details.
+          try {
+            localStorage.setItem('shopInfo', JSON.stringify(this.shopInfo));
+          } catch (e) { /* private mode — the page falls back to defaults */ }
+        }
         this.savedAddresses = resp.data.savedAddresses || [];
         this.delivery_description = resp.data.delivery_description;
         this.in_person_description = resp.data.in_person_description;
         this.mode = resp.data.mode;
         this.taxEnabled = !!resp.data.taxEnabled;
         this.taxPercent = Number(resp.data.taxPercent) || 0;
+        this.etaMinutes = Number(resp.data.deliveryEtaMinutes) || 0;
+        this.showProductRating = !!resp.data.showProductRating;
+        if (resp.data.deliveryEtaLabel) this.labels.deliveryEta = resp.data.deliveryEtaLabel;
+        if (resp.data.pickupEtaLabel) this.labels.pickupEta = resp.data.pickupEtaLabel;
+        if (resp.data.shippingChipLabel) this.labels.shippingChip = resp.data.shippingChipLabel;
         applyAppModeTheme(this.mode);
+        this.publicOffers = resp.data.publicOffers || [];
         this.setProduct();
+        // The offers row sits above the menu, so personal codes have to be
+        // fetched at load rather than when the basket opens.
+        this.loadMyDiscountCodes();
 
         if (this.productCategories.length > 0) {
           this.$nextTick(() => {
             this.handleTabChange(this.tabIndex);
             if (!this.currentActiveTabId) {
-              const first = this.visibleCategories[0];
+              const first = this.menuNavCategories[0];
               if (first) this.currentActiveTabId = first.id;
             }
           });
@@ -862,7 +1269,9 @@ export default {
       total_amount: 0,
       menu_type: product.menu_type,
       isSpecial: product.isSpecial,
-      specialDaysText: product.specialDaysText
+      specialDaysText: product.specialDaysText,
+      ratingAverage: product.ratingAverage,
+      ratingCount: product.ratingCount
     });
   }
   this.display_product = true;
@@ -890,16 +1299,13 @@ export default {
     // },
     addProductCount(pKey, unit) {
       const selectedProduct = this.productData[pKey];
+      if (!selectedProduct) return;
       const selectedMenuType = selectedProduct.menu_type;
 
-      if (selectedMenuType === 'specialDay') {
-        if (this.delivery_date === -1) {
-          this.$bvToast.toast("لطفاً ابتدا تاریخ تحویل را انتخاب کنید تا امکان سنجی سرو غذا مشخص شود.", {
-            variant: "warning",
-          });
-          return;
-        }
-
+      // Customers add food before opening the basket to select a delivery
+      // date. Validate its weekday when a date is already selected; final
+      // checkout validates the date for every special-day item.
+      if (selectedMenuType === 'specialDay' && this.delivery_date !== -1) {
         const selectedDeliveryDate = this.deliveryItems[this.delivery_date].date;
         const dayOfWeek = moment(selectedDeliveryDate, "YYYY/M/D").day();
         // const dayOfWeek = moment(selectedDeliveryDate, "YYYY/M/D").startOf('day').day();
@@ -950,7 +1356,7 @@ export default {
           Number(this.productData[product.key].count);
       }
 
-      if (this.delivery_type === 'sendToMe') {
+      if (this.delivery_type === 'sendToMe' && this.bill.total_amount > 0) {
         this.bill.shipping_amount = Number(this.shippingCost || 0);
       }
 
@@ -1122,7 +1528,7 @@ export default {
         let res = await this.$validator.validateAll("discountCode");
         if (!res) throw "فرم زیر را تکمیل کنید";
 
-        let resp = await this.$axios.get("/api/enduser/core/check-discount-code/" + this.discountCode.code + `?basketAmount=${this.bill.payment_amount}`);
+        let resp = await this.$axios.get("/api/enduser/core/check-discount-code/" + encodeURIComponent(String(this.discountCode.code || '').trim()) + `?basketAmount=${this.bill.payment_amount}`);
         this.discountCode.code_valid_status = true;
         const discountValue = Number(resp.data.value)
 
@@ -1133,10 +1539,15 @@ export default {
 
 
       } catch (error) {
-        if (error.response)
-          this.$bvToast.toast(error.response.data.message, {
-            variant: "danger",
-          });
+        const body = error && error.response && error.response.data;
+        let message = body && (body.message || body.error || body.detail);
+        if (Array.isArray(message)) message = message.join('، ');
+        if (typeof message !== 'string' || !message.trim()) {
+          message = error && !error.response
+            ? 'ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی کنید.'
+            : 'اعتبارسنجی کد تخفیف انجام نشد. دوباره تلاش کنید.';
+        }
+        this.$bvToast.toast(message, { variant: "danger" });
       }
     },
     async cancelDiscountCode() {
@@ -1146,7 +1557,13 @@ export default {
     },
     registerSuccess() {
       this.$bvModal.hide("modal-login");
+      if (this.profileLoginPending) {
+        this.profileLoginPending = false;
+        this.$router.push('/profile');
+        return;
+      }
       this.$bvModal.show("success-login");
+      if (this.pendingContinue) this.advanceToDetails();
 
       this.loginForm = {
         step: "checkMobile",
@@ -1161,14 +1578,18 @@ export default {
     },
     loginSuccess() {
       this.$bvModal.hide("modal-login");
+      if (this.profileLoginPending) {
+        this.profileLoginPending = false;
+        this.$router.push('/profile');
+        return;
+      }
       if (this.auth.discountCodeRequest == true) {
         this.approveDiscountCode();
         this.auth.discountCodeRequest = false;
       } else {
         this.$bvModal.show("success-login");
       }
-
-
+      if (this.pendingContinue) this.advanceToDetails();
     },
     async logout() {
       try {
@@ -1205,15 +1626,9 @@ export default {
       const result = moment(date, "YYYY/M/D").format(format);
       return result.replaceAll('آدینه', 'جمعه');
     },
+    formatJalaliDate,
     getDeliveryItemText(index) {
-      switch (index) {
-        case 0:
-          return 'امروز';
-        case 1:
-          return 'فردا';
-        case 2:
-          return 'پس فردا'
-      }
+      return deliveryDayLabel(index);
     },
     setDeliveryTimeItems(index) {
       this.delivery_time = null;
@@ -1224,9 +1639,7 @@ export default {
       }
     },
     showImageModal(imageSrc) {
-      this.modal.image = imageSrc
-        ? String(imageSrc).replace('/food/thumbnail/', '/food/')
-        : imageSrc;
+      this.modal.image = imageSrc;
       if (!imageSrc)
         return
       this.$bvModal.show("image-details-modal");
@@ -1265,13 +1678,45 @@ export default {
   },
   computed: {
     showCategoryTabs() {
-      const cats = this.visibleCategories;
+      const cats = this.menuNavCategories;
       return cats.length > 1;
     },
-    visibleCategories() {
-      return this.productCategories.filter(cat =>
-        this.products.some(p => p.categoryId === cat.id)
+    hasChefDaily() {
+      return this.chefDailyProducts.length > 0;
+    },
+    chefDailyProducts() {
+      const q = (this.menuSearch || '').trim();
+      return this.products.filter((p) =>
+        p.menu_type === 'specialDay' &&
+        (!q || (p.name || '').includes(q) || (p.description || '').includes(q))
       );
+    },
+    // Categories that still have at least one non-chef-daily product. Chef's
+    // daily foods live in their own leading tab, so they are not repeated here.
+    realVisibleCategories() {
+      return this.productCategories.filter(
+        (cat) => this.categoryProducts(cat.id).length > 0
+      );
+    },
+    visibleCategories() {
+      return this.realVisibleCategories;
+    },
+    menuNavCategories() {
+      const categories = this.visibleCategories.map((cat) => ({ ...cat }));
+      if (this.hasChefDaily) {
+        categories.unshift({
+          id: CHEF_TAB_ID,
+          text: 'غذای روز',
+          count: this.chefDailyProducts.length,
+        });
+      }
+      return categories;
+    },
+    sheetCategories() {
+      return this.menuNavCategories.map((cat) => ({
+        ...cat,
+        count: cat.id === CHEF_TAB_ID ? this.chefDailyProducts.length : this.categoryProducts(cat.id).length,
+      }));
     },
     weeklyPlan() {
       const dayNames = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه'];
@@ -1298,7 +1743,7 @@ export default {
     },
     currentOrderStatusLabel() {
       if (!this.currentOrder) return '';
-      const map = { 10: 'در انتظار تایید رستوران', 12: 'در حال آماده‌سازی', 13: 'تحویل پیک', 1: 'پرداخت شده' };
+      const map = { 10: 'در انتظار تایید رستوران', 12: 'در حال آماده‌سازی', 13: 'تحویل پیک', 1: 'پرداخت شده', 2: 'پرداخت شده (نقدی)' };
       return map[this.currentOrder.status] || 'در حال پیگیری';
     },
     selectedProducts() {

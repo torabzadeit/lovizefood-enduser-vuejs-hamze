@@ -21,6 +21,7 @@ export default {
       {name: "theme-color", content: "#ffffff"},
     ],
     link: [
+      {rel: 'manifest', href: '/manifest.webmanifest', hid: 'manifest'},
       {rel: 'apple-touch-icon', size: '180x180', href: '/icons/apple-touch-icon.png'},
       {rel: 'icon', type: 'image/png', size: '32x32', href: '/icons/favicon-32x32.png'},
       {rel: 'icon', type: 'image/png', size: '16x16', href: '/icons/favicon-16x16.png'},
@@ -50,6 +51,13 @@ export default {
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins
   plugins: [
     "~/plugins/veeValidate",
+    // axios.js was present but never registered here, so its error handling
+    // (notably clearing a dead token on 401) never ran.
+    "~/plugins/axios",
+  ],
+
+  serverMiddleware: [
+    '~/server-middleware/manifest.js',
   ],
 
   // Auto import components: https://go.nuxtjs.dev/config-components
@@ -91,8 +99,8 @@ export default {
 
   // PWA module configuration: https://go.nuxtjs.dev/pwa
   pwa: {
-    short_name: "HalimBehesht",
-    name: "Halim Behesht",
+    short_name: "Loviz",
+    name: "Loviz",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",
@@ -100,9 +108,9 @@ export default {
     background_color: "#fff",
     lang: 'fa',
     manifest: {
-      short_name: "HalimBehesht",
-      name: "Halim Behesht",
-      description: "Halim Behesht",
+      short_name: "Loviz",
+      name: "Loviz",
+      description: "Loviz",
       start_url: "/",
       display: "standalone",
       orientation: "portrait",
