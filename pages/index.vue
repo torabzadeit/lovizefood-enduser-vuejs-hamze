@@ -799,7 +799,7 @@ export default {
       supportPhone: '09155611540',
       // Overwritten from /core/initialize; these are only what shows before
       // the first response lands.
-      enamad: { id: '7875248', code: 'VIKq8FP3KkU7QRlCmSEIZgP8GD4wtPCC' },
+      enamad: { id: '8159726', code: 'BPjiYd4x54ASb7bcPXYqLLO7EyG86QNC' },
       pwaCallOutText: 'اپ لاویز را به صفحه اصلی گوشی خود اضافه نمایید.',
       shopInfo: {
         name: 'رستوران لاویز',
