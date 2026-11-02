@@ -34,7 +34,7 @@
                      the /profile page. Restore this line to bring it back.
                 <a href="#" @click.prevent="$refs.profileModal.open()">پروفایل</a> -->
                 <a v-if="auth.is_login" href="#" @click.prevent="$router.push('/profile')">پروفایل</a>
-                <a v-else href="#" @click.prevent="openProfileLogin">ورود به پروفایل</a>
+                <button v-else type="button" class="laviz-user-bar__login" @click="openProfileLogin">ورود</button>
                 <a v-if="auth.is_login" href="#" @click.prevent="logout()">خروج</a>
               </span>
             </div>
@@ -77,6 +77,7 @@
             <delivery-type-bar
               v-model="delivery_type"
               :options="deliveryTypeOptions"
+              :showSwitch="false"
               :shippingCost="shippingCost"
               :etaMinutes="etaMinutes"
               :deliveryEtaLabel="labels.deliveryEta"

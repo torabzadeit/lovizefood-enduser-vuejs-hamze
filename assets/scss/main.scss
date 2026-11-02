@@ -126,6 +126,24 @@ body {
   }
 }
 
+// Filled primary button for the logged-out state (was a text link).
+.laviz-user-bar__login {
+  border: 0;
+  border-radius: var(--laviz-radius-sm);
+  padding: 0.4rem 1.25rem;
+  min-height: 36px;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  background: var(--laviz-primary);
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--laviz-primary-dark);
+  }
+}
+
 .laviz-status-card {
   display: flex;
   flex-direction: column;
