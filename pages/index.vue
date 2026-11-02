@@ -9,34 +9,35 @@
       <div class="container">
         <div class="row">
 
-          <!-- Collapsed state: a single thin line with just the shop name, so
-               the menu keeps the screen once the customer starts browsing. -->
-          <div v-if="headerCollapsed" class="col-12 laviz-app-header__compact">
-            <span class="laviz-app-header__compact-title">رستوران لاویز</span>
-          </div>
-
-          <div v-if="!headerCollapsed" class="col-md-12 laviz-app-header__brand">
-            <img src="@/assets/media/logo.png" class="laviz-app-header__logo" alt="لاویز"/>
-            <h1 class="laviz-app-header__title">رستوران لاویز</h1>
-            <span v-if="mode === 0" class="laviz-mode-ribbon">🌙 ماه مبارک رمضان</span>
-            <p
-              v-if="mode === 0"
-              class="laviz-app-header__subtitle">سفارش آنلاین شله و حلیم ویژه ماه مبارک رمضان
-            </p>
-          </div>
-
           <div class="col-md-12">
-            <div class="laviz-user-bar">
-              <span v-if="auth.is_login">{{ auth.user.first_name + " " + auth.user.last_name }} عزیز، خوش آمدید</span>
-              <span v-else>برای مشاهدهٔ پروفایل وارد حساب خود شوید</span>
-              <span class="laviz-user-bar__actions">
-                <!-- ROLLBACK[profile-modal-link]: the profile modal was replaced by
-                     the /profile page. Restore this line to bring it back.
-                <a href="#" @click.prevent="$refs.profileModal.open()">پروفایل</a> -->
-                <a v-if="auth.is_login" href="#" @click.prevent="$router.push('/profile')">پروفایل</a>
+            <!-- One row: brand on the start side, the two actions on the end side.
+                 Same in the expanded and collapsed header, so nothing jumps on scroll. -->
+            <div class="laviz-topbar">
+              <div class="laviz-topbar__brand">
+                <img src="@/assets/media/logo.png" class="laviz-topbar__logo" alt=""/>
+                <h1 class="laviz-topbar__title">{{ shopInfo.name }}</h1>
+              </div>
+              <div class="laviz-topbar__actions">
+                <button
+                  type="button"
+                  class="laviz-icon-btn"
+                  aria-label="مسیریابی به رستوران"
+                  title="مسیریابی به رستوران"
+                  @click="$bvModal.show('modal-navigate')"
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                    <path d="M12 2.5 4.5 20.2c-.2.5.4 1 .9.7L12 17l6.6 3.9c.5.3 1.1-.2.9-.7L12 2.5z"
+                          fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button v-if="auth.is_login" type="button" class="laviz-user-bar__login" @click="$router.push('/profile')">پروفایل</button>
                 <button v-else type="button" class="laviz-user-bar__login" @click="openProfileLogin">ورود</button>
-                <a v-if="auth.is_login" href="#" @click.prevent="logout()">خروج</a>
-              </span>
+                <button v-if="auth.is_login" type="button" class="laviz-topbar__logout" @click="logout()">خروج</button>
+              </div>
+            </div>
+            <div v-if="mode === 0 && !headerCollapsed" class="laviz-topbar__ramadan">
+              <span class="laviz-mode-ribbon">🌙 ماه مبارک رمضان</span>
+              <p class="laviz-app-header__subtitle">سفارش آنلاین شله و حلیم ویژه ماه مبارک رمضان</p>
             </div>
             <div v-if="currentOrder" class="laviz-status-card laviz-status-card--expandable">
               <div class="d-flex justify-content-between align-items-center flex-wrap">
@@ -701,6 +702,12 @@
           />
         </a>
       </footer>
+      <navigate-sheet
+        :lat="Number(mapCenter.lat)"
+        :lng="Number(mapCenter.lng)"
+        :name="shopInfo.name"
+        :address="shopInfo.address"
+      />
       <success-login-modal
         @order="order"
         :auth="auth"/>
@@ -749,6 +756,7 @@ import 'moment/locale/fa'  // برای فارسی
 moment.locale('fa')
 import PwaCallOut from "../components/pwa-call-out.vue";
 import SuccessLoginModal from "./index/components/successLoginModal.vue";
+import NavigateSheet from "./index/components/navigateSheet.vue";
 import RegisterModal from "./index/components/registerModal.vue";
 import BillModal from "./index/components/billModal.vue";
 import Vue from "vue";
@@ -778,7 +786,7 @@ moment.loadPersian(true, {dialect: "persian-modern"});
 
 export default {
   name: "index",
-  components: {ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
+  components: {NavigateSheet, ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
   data() {
     return {
       modal: {

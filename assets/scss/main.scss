@@ -131,7 +131,7 @@ body {
   border: 0;
   border-radius: var(--laviz-radius-sm);
   padding: 0.4rem 1.25rem;
-  min-height: 36px;
+  min-height: 44px;
   font: inherit;
   font-weight: 700;
   color: #fff;
@@ -142,6 +142,82 @@ body {
   &:focus-visible {
     background: var(--laviz-primary-dark);
   }
+}
+
+// Single-row header: brand on the start side, actions on the end side.
+.laviz-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 60px;
+  padding: 0.35rem 0;
+}
+
+.laviz-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.laviz-topbar__logo {
+  height: 40px;
+  width: auto;
+  flex: none;
+}
+
+.laviz-topbar__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--laviz-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.laviz-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+
+// Icon-only action; 44px keeps it comfortably tappable.
+.laviz-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--laviz-border);
+  border-radius: var(--laviz-radius-sm);
+  background: var(--laviz-surface);
+  color: var(--laviz-primary);
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--laviz-primary);
+  }
+}
+
+.laviz-topbar__logout {
+  border: 0;
+  background: transparent;
+  color: var(--laviz-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0 0.25rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.laviz-topbar__ramadan {
+  text-align: center;
+  padding-bottom: 0.4rem;
 }
 
 .laviz-status-card {
