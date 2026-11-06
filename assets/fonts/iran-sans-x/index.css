@@ -1,0 +1,76 @@
+/* IRANSansX (Persian digits). Each weight is its own font file. Two ways to
+   use them:
+   - font-family: IRANSansX with a font-weight picks the nearest real file
+     (600 and up use Heavy); no faux bold is ever synthesized.
+   - font-family: IRANSansXHeavy (etc.) names one file directly, with
+     font-weight left at normal. */
+@font-face {
+  font-family: IRANSansX;
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Thin.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansXThin;
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Thin.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansX;
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Light.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansXLight;
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Light.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansX;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansXRegular;
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansX;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansXMedium;
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansX;
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Heavy.woff2") format("woff2");
+}
+@font-face {
+  font-family: IRANSansXHeavy;
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+  src: url("IRANSansXFaNum-Heavy.woff2") format("woff2");
+}

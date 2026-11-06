@@ -93,9 +93,10 @@
 
   /* ---- Type --------------------------------------------------------------
      Hierarchy comes from size and negative tracking, not heavy weights.
-     Persian faces are listed first: iranSansX matches the reference, and
-     the bundled YekanBakh is the fallback that actually ships. */
-  --lz-font: iranSansX, YekanBakh, Vazirmatn, Tahoma, ui-sans-serif, system-ui, sans-serif;
+     IRANSansX ships with the app (assets/fonts/iran-sans-x); the rest are
+     only fallbacks. */
+  --lz-font: IRANSansX, Vazirmatn, Tahoma, ui-sans-serif, system-ui, sans-serif;
+  --lz-font-heavy: IRANSansXHeavy, IRANSansX, Vazirmatn, Tahoma, ui-sans-serif, system-ui, sans-serif;
 
   --lz-text-caption: 11px;
   --lz-text-sm: 12px;

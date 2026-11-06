@@ -2554,5 +2554,8 @@ html[data-theme='dark'] .time-sheet__slot--active {
   box-shadow: none;
   color: #fff;
   font-size: 1.05rem;
+  /* The heavy face is its own font file: switch the face, not the weight. */
+  font-family: var(--lz-font-heavy);
+  font-weight: normal;
 }
 
