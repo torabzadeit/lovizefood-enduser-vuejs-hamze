@@ -1,7 +1,8 @@
 /* IRANSansX (Persian digits). Each weight is its own font file. Two ways to
    use them:
-   - font-family: IRANSansX with a font-weight picks the nearest real file
-     (600 and up use Heavy); no faux bold is ever synthesized.
+   - font-family: IRANSansX with a font-weight picks the nearest real file.
+     Everything from 500 to 800 ("bold" in the UI) uses Medium; only an
+     explicit 900 uses Heavy. No faux bold is ever synthesized.
    - font-family: IRANSansXHeavy (etc.) names one file directly, with
      font-weight left at normal. */
 @font-face {
@@ -49,7 +50,7 @@
 @font-face {
   font-family: IRANSansX;
   font-style: normal;
-  font-weight: 500;
+  font-weight: 500 800;
   font-display: swap;
   src: url("IRANSansXFaNum-Medium.woff2") format("woff2");
 }

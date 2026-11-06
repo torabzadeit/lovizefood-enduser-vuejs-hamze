@@ -1638,16 +1638,6 @@ body {
   background: var(--lz-canvas);
 }
 
-.laviz-delivery-description {
-  padding: 0.65rem 0.8rem;
-  border-right: 3px solid var(--laviz-primary);
-  border-radius: var(--laviz-radius-sm);
-  background: var(--laviz-primary-light);
-  color: var(--laviz-text);
-  font-size: 0.86rem;
-  line-height: 1.9;
-}
-
 /* Keep the entire desktop storefront inside the phone-width canvas. The
    viewport bleed is useful on narrow screens, but would stretch discounts and
    menu sections across a wide monitor. */
@@ -2554,8 +2544,16 @@ html[data-theme='dark'] .time-sheet__slot--active {
   box-shadow: none;
   color: #fff;
   font-size: 1.05rem;
-  /* The heavy face is its own font file: switch the face, not the weight. */
-  font-family: var(--lz-font-heavy);
+  /* A heavier face is its own font file: switch the face, not the weight. */
+  font-family: var(--lz-font-strong);
   font-weight: normal;
+}
+
+/* Note under the delivery-type choices. */
+.laviz-choice-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.8;
+  color: var(--lz-ink-muted);
 }
 

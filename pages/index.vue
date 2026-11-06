@@ -385,6 +385,10 @@
                     <small v-if="timeMode === 'scheduled'" class="laviz-day__note">تغییر ساعت</small>
                   </button>
                 </div>
+                <!-- Plain note from the restaurant, last thing in the time section. -->
+                <p v-if="delivery_description && delivery_type == 'sendToMe'" class="laviz-choice-note">
+                  {{ delivery_description }}
+                </p>
               </div>
 
               <div class="mt-3">
@@ -406,6 +410,10 @@
                     <span class="laviz-choice__text">{{ opt.text }}</span>
                   </label>
                 </div>
+                <!-- Delivery fee note sits right under the send option it belongs to. -->
+                <p v-if="delivery_type == 'sendToMe'" class="laviz-choice-note">
+                  هزینه ارسال {{ formatNum(shippingCost) }} تومان به فاکتور اضافه می‌شود. ارسال فقط در محدوده شهر.
+                </p>
               </div>
 
 
@@ -430,12 +438,6 @@
                 v-if="delivery_type == 'sendToMe'"
               >
                 <label class="form-label font-weight-bold">آدرس تحویل</label>
-                <p class="text-muted small mb-2">
-                  هزینه ارسال {{ formatNum(this.shippingCost) }} تومان به فاکتور اضافه می‌شود. ارسال فقط در محدوده شهر.
-                </p>
-                <p v-if="delivery_description" class="laviz-delivery-description mb-2">
-                  {{ delivery_description }}
-                </p>
                 <div v-if="savedAddresses.length" class="form-group laviz-saved-addresses">
                   <label class="small d-block mb-2">آدرس‌های ذخیره‌شده</label>
                   <div class="laviz-saved-address-list">
@@ -809,7 +811,7 @@
         :map-center="mapCenter"
         @addresses-changed="refreshSavedAddresses"
       />
-      <image-details-modal :visible.sync="imageOpen" :src="modal.image"/>
+      <image-details-modal :visible.sync="imageOpen" :src="modal.image" :name="modal.name" :description="modal.description"/>
       <pwa-call-out :text="pwaCallOutText"/>
     </div>
 
@@ -865,6 +867,8 @@ export default {
     return {
       modal: {
         image: null,
+        name: '',
+        description: '',
       },
       loading: false,
       shippingCost: 0,
@@ -1480,7 +1484,7 @@ export default {
         ? this.$axios.defaults.baseURL + product.thumbnail
         : product.image
           ? this.$axios.defaults.baseURL + product.image
-          : require('@/assets/media/no-image.jpg'),
+          : '', // no picture: the card leaves the slot empty
       imageFull: product.image ? this.$axios.defaults.baseURL + product.image : null,
       discount_percent: product.discount_percent,
       description: product.description,
@@ -1877,9 +1881,13 @@ export default {
     faTime(value) {
       return String(value || '').replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d]);
     },
-    showImageModal(imageSrc) {
-      if (!imageSrc) return;
-      this.modal.image = imageSrc;
+    // Accepts the product card's { src, name, description } (or just a URL).
+    showImageModal(payload) {
+      const info = typeof payload === 'string' ? { src: payload } : (payload || {});
+      if (!info.src) return;
+      this.modal.image = info.src;
+      this.modal.name = info.name || '';
+      this.modal.description = info.description || '';
       this.imageOpen = true;
     },
     removeProduct(pKey) {

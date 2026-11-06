@@ -4,10 +4,11 @@
     <div class="product-card__side">
       <div
         class="product-card__media"
-        :class="{ 'product-card__media--zoomable': hasPhoto }"
+        :class="{ 'product-card__media--zoomable': hasPhoto, 'product-card__media--empty': !showImage }"
         @click="showImageDetailsModal"
       >
-        <img class="product-card__img" :src="finalImage" alt="" @error="onImageError" />
+        <!-- A product without a picture leaves the slot empty: no placeholder. -->
+        <img v-if="showImage" class="product-card__img" :src="image" alt="" @error="imageFailed = true" />
         <!-- A small, faint cue that the photo can be opened. -->
         <span v-if="hasPhoto" class="product-card__zoom" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -80,7 +81,7 @@ export default {
     isOutOfStock: { type: Boolean, default: true },
     unit_name: undefined,
     image: String,
-    // The large photo, when the product has one; products without a photo show a placeholder and do not open.
+    // The large photo, when the product has one; a product without a photo leaves the slot empty and does not open.
     fullImage: { type: String, default: '' },
     hasPhoto: { type: Boolean, default: false },
     isSpecial: { type: Boolean, default: false },
@@ -91,27 +92,30 @@ export default {
     locked: { type: Boolean, default: false },
     lockedLabel: { type: String, default: 'فقط در روز خودش' },
   },
+  data() {
+    return { imageFailed: false };
+  },
+  watch: {
+    image() { this.imageFailed = false; },
+  },
   methods: {
     showImageDetailsModal() {
       if (!this.hasPhoto) return;
-      this.$emit('imageClick', this.fullImage || this.image);
-    },
-    // A product whose stored file is missing would otherwise render as a broken
-    // image; fall back to the same placeholder used when no image is set.
-    onImageError(event) {
-      const placeholder = require('@/assets/media/no-image.jpg');
-      if (event.target.getAttribute('src') !== placeholder) {
-        event.target.setAttribute('src', placeholder);
-      }
+      // The viewer also shows the product's name and full description.
+      this.$emit('imageClick', {
+        src: this.fullImage || this.image,
+        name: this.name,
+        description: this.description,
+      });
     },
     formatNum(val) {
       return val?.toLocaleString();
     },
   },
   computed: {
-    finalImage() {
-      if (this.image) return this.image;
-      return require('@/assets/media/no-image.jpg');
+    // A missing or unreadable file also leaves the slot empty.
+    showImage() {
+      return !!this.image && !this.imageFailed;
     },
   },
 };
@@ -423,5 +427,12 @@ export default {
   background: rgba(30, 24, 25, 0.42);
   opacity: 0.8;
   pointer-events: none;
+}
+
+/* No picture: the slot keeps its size so the card lines up, but shows nothing. */
+.product-card__media.product-card__media--empty {
+  box-shadow: none;
+  background: transparent;
+  cursor: default;
 }
 </style>

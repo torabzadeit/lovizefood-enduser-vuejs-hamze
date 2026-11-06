@@ -41,9 +41,9 @@
     // Sample personal discount codes (fixed amounts in toman), as the API would
     // return them for a signed-in customer.
     const sampleCodes = [
-      { id: 'dc-1', code: 'LAVIZ50', title: 'هدیه خوش‌آمد', amount: 50000, remainingDays: 6 },
-      { id: 'dc-2', code: 'QAEN20', title: 'تخفیف قائن', amount: 20000, remainingDays: 1 },
-      { id: 'dc-3', code: 'FRIDAY100', title: 'جمعه خانوادگی', amount: 100000, remainingDays: null },
+      { id: 'dc-1', code: 'LAVIZ50', title: 'هدیه خوش‌آمد', amount: 50000, percent: 10, remainingDays: 6 },
+      { id: 'dc-2', code: 'QAEN20', title: 'تخفیف قائن', amount: 20000, percent: 5, remainingDays: 1 },
+      { id: 'dc-3', code: 'FRIDAY100', title: 'جمعه خانوادگی', amount: 100000, percent: 15, remainingDays: null },
     ];
     const usedCodes = [{ id: 'dc-0', code: 'WELCOME', title: 'اولین سفارش', amount: 30000, expTime: null }];
     const findCode = (code) => sampleCodes.find((c) => c.code.toLowerCase() === String(code || '').trim().toLowerCase());
@@ -75,7 +75,7 @@
         total = Math.round(total);
         const shipping = body.delivery_type === 'sendToMe' ? snapshot.shippingCost : 0;
         const found = findCode(body.discount_code);
-        const discount = found ? Math.min(found.amount, total) : 0;
+        const discount = found ? Math.min(found.percent ? Math.round((total * found.percent) / 100) : found.amount, total) : 0;
         const tax = snapshot.taxEnabled ? Math.round((total - discount) * snapshot.taxPercent / 100) : 0;
         return json({ total_amount: total, discount_amount: discount, shipping_cost: shipping, tax_amount: tax, payment_amount: total - discount + shipping + tax, is_first_order: false });
       },
@@ -90,7 +90,7 @@
         const found = findCode(decodeURIComponent(m[1]));
         if (!found) return json({ statusCode: 400, message: 'کد تخفیف معتبر نیست یا منقضی شده است.' }, 400);
         const basket = Number((query && query.get && query.get('basketAmount')) || 0);
-        const percent = basket > 0 ? Math.min(100, (found.amount / basket) * 100) : 0;
+        const percent = found.percent || (basket > 0 ? Math.min(100, (found.amount / basket) * 100) : 0);
         return json({ value: Number(percent.toFixed(4)), amount: found.amount });
       }
       const h = routes[`${method} ${pathname}`];

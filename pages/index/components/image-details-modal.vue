@@ -10,7 +10,13 @@
           <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />
         </svg>
       </button>
-      <img class="lightbox__img" :src="src" alt="">
+      <img class="lightbox__img" :class="{ 'lightbox__img--with-text': hasText }" :src="src" alt="">
+      <!-- Full description under the photo. A tap anywhere closes the viewer,
+           the text included; a long text still scrolls with a swipe. -->
+      <div v-if="hasText" class="lightbox__info">
+        <h3 v-if="name" class="lightbox__name">{{ name }}</h3>
+        <p v-if="description" class="lightbox__desc">{{ description }}</p>
+      </div>
     </div>
   </transition>
 </template>
@@ -23,6 +29,13 @@ export default {
   props: {
     visible: { type: Boolean, default: false },
     src: String,
+    name: { type: String, default: '' },
+    description: { type: String, default: '' },
+  },
+  computed: {
+    hasText() {
+      return !!(this.name || this.description);
+    },
   },
   watch: {
     visible(open) {
@@ -95,6 +108,36 @@ export default {
   border-radius: 20px;
   background: #fff;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox__img--with-text {
+  /* Leave room for the description underneath. */
+  width: min(92vw, 52vh, 520px);
+}
+
+.lightbox__info {
+  width: min(92vw, 560px);
+  max-height: 32vh;
+  overflow-y: auto;
+  padding: 2px 4px;
+  color: #fff;
+  text-align: right;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lightbox__name {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+.lightbox__desc {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.95;
+  color: rgba(255, 255, 255, 0.86);
+  white-space: pre-line;
 }
 
 .lightbox__close {
