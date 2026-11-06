@@ -127,7 +127,7 @@ export default {
 
 .order-history__empty {
   text-align: center;
-  color: #8a7f6d;
+  color: var(--lz-ink-muted);
   font-size: 0.85rem;
   padding: 1.5rem 0;
   margin: 0;
@@ -143,7 +143,7 @@ export default {
   border: 1px solid rgba(42, 35, 24, 0.08);
   border-radius: 10px;
   padding: 1rem;
-  background: #fafaf8;
+  background: var(--lz-surface-light);
   transition: border-color 0.15s;
 }
 
@@ -152,7 +152,7 @@ export default {
 }
 
 .order-card--pending {
-  border-left: 3px solid #c44536;
+  border-left: 3px solid var(--lz-accent);
 }
 
 .order-card__header {
@@ -165,7 +165,7 @@ export default {
 .order-card__id {
   font-weight: 700;
   font-size: 0.9rem;
-  color: #2a2318;
+  color: var(--lz-ink);
 }
 
 .order-card__status {
@@ -199,7 +199,7 @@ export default {
   display: flex;
   gap: 1rem;
   font-size: 0.8rem;
-  color: #8a7f6d;
+  color: var(--lz-ink-muted);
   margin-bottom: 0.7rem;
   padding-bottom: 0.7rem;
   border-bottom: 1px solid rgba(42, 35, 24, 0.06);
@@ -224,7 +224,7 @@ export default {
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #2a2318;
+  color: var(--lz-ink);
 }
 
 .order-item-price {
@@ -234,7 +234,7 @@ export default {
 .order-card__total {
   text-align: left;
   font-size: 0.9rem;
-  color: #2a2318;
+  color: var(--lz-ink);
   margin-bottom: 0.7rem;
 }
 
@@ -250,7 +250,7 @@ export default {
   padding: 0.6rem 0.8rem;
   font-size: 0.75rem;
   font-weight: 700;
-  background: #c44536;
+  background: var(--lz-accent);
   color: #fff;
   cursor: pointer;
   text-decoration: none;
@@ -264,7 +264,7 @@ export default {
 
 .order-action-btn--secondary {
   background: transparent;
-  border: 1px solid #c44536;
-  color: #c44536;
+  border: 1px solid var(--lz-accent);
+  color: var(--lz-accent);
 }
 </style>

@@ -185,6 +185,14 @@
           />
         </section>
 
+        <!-- Sign out lives here; the header only carries the profile button. -->
+        <button type="button" class="profile-logout" @click="logout">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 4.5H6.5A2 2 0 0 0 4.5 6.5v11a2 2 0 0 0 2 2H9M15.5 8l4 4-4 4M19.5 12H9.5" />
+          </svg>
+          خروج از حساب
+        </button>
+
         <!-- Address form modal -->
         <address-form
           v-if="showAddressForm"
@@ -243,6 +251,33 @@ export default {
     await this.loadOrders();
   },
   methods: {
+    /** Signs out after a confirmation, then returns to the menu. */
+    async logout() {
+      let confirmed = false;
+      try {
+        confirmed = await this.$bvModal.msgBoxConfirm('آیا برای خروج از حساب اطمینان دارید؟', {
+          title: 'خروج از حساب',
+          size: 'sm',
+          buttonSize: 'sm',
+          okVariant: 'primary',
+          cancelVariant: 'outline-secondary',
+          okTitle: 'بله، خروج',
+          cancelTitle: 'انصراف',
+          headerClass: 'p-2 border-bottom-0',
+          footerClass: 'p-2 border-top-0',
+          centered: true,
+        });
+      } catch (e) {
+        confirmed = false;
+      }
+      if (confirmed !== true) return;
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } catch (e) { /* storage blocked */ }
+      delete this.$axios.defaults.headers.common['Authorization'];
+      this.$router.replace('/');
+    },
     openReview(order) {
       this.$refs.reviewModal.open(order);
     },
@@ -354,7 +389,7 @@ export default {
 .profile-page {
   padding: 1rem 0 3rem;
   min-height: 100vh;
-  background: #fafaf8;
+  background: var(--lz-surface-light);
 }
 
 .profile-header {
@@ -363,7 +398,7 @@ export default {
   gap: 0.8rem;
   padding: 1rem 0.9rem;
   margin-bottom: 1.5rem;
-  background: #fff;
+  background: var(--lz-surface);
   border-bottom: 1px solid rgba(42, 35, 24, 0.08);
 }
 
@@ -372,7 +407,7 @@ export default {
   background: none;
   font-size: 1.2rem;
   cursor: pointer;
-  color: #2a2318;
+  color: var(--lz-ink);
   padding: 0.3rem;
 }
 
@@ -381,7 +416,7 @@ export default {
   font-size: 1.1rem;
   font-weight: 800;
   margin: 0;
-  color: #2a2318;
+  color: var(--lz-ink);
 }
 
 .profile-header__spacer {
@@ -395,7 +430,7 @@ export default {
 }
 
 .profile-section {
-  background: #fff;
+  background: var(--lz-surface);
   border-radius: 14px;
   padding: 1.2rem;
   margin-bottom: 1rem;
@@ -413,13 +448,13 @@ export default {
   font-size: 1rem;
   font-weight: 800;
   margin: 0;
-  color: #2a2318;
+  color: var(--lz-ink);
 }
 
 .profile-section__edit-btn {
   border: none;
   background: none;
-  color: #c44536;
+  color: var(--lz-accent);
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
@@ -441,13 +476,13 @@ export default {
 
 .profile-info__label {
   font-size: 0.85rem;
-  color: #8a7f6d;
+  color: var(--lz-ink-muted);
   font-weight: 700;
 }
 
 .profile-info__value {
   font-size: 0.85rem;
-  color: #2a2318;
+  color: var(--lz-ink);
   font-weight: 600;
 }
 
@@ -466,7 +501,7 @@ export default {
 .form-label {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #2a2318;
+  color: var(--lz-ink);
 }
 
 .form-control {
@@ -479,7 +514,7 @@ export default {
 
 .form-control:focus {
   outline: none;
-  border-color: #c44536;
+  border-color: var(--lz-accent);
   box-shadow: 0 0 0 2px rgba(196, 69, 54, 0.1);
 }
 
@@ -501,7 +536,7 @@ export default {
 }
 
 .btn-primary {
-  background: #c44536;
+  background: var(--lz-accent);
   color: #fff;
 }
 
@@ -511,14 +546,14 @@ export default {
 }
 
 .btn-outline-primary {
-  border: 1px solid #c44536;
-  color: #c44536;
+  border: 1px solid var(--lz-accent);
+  color: var(--lz-accent);
   background: transparent;
 }
 
 .btn-outline-secondary {
-  border: 1px solid #8a7f6d;
-  color: #8a7f6d;
+  border: 1px solid var(--lz-ink-muted);
+  color: var(--lz-ink-muted);
   background: transparent;
 }
 
@@ -533,5 +568,27 @@ export default {
 
 .mt-2 {
   margin-top: 0.8rem;
+}
+
+.profile-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 48px;
+  margin: 0.5rem 0 1.5rem;
+  border: 1px solid var(--lz-border-strong);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--lz-ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.profile-logout:active {
+  transform: scale(0.98);
 }
 </style>

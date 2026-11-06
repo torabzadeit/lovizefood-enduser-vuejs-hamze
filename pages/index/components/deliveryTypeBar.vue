@@ -23,7 +23,7 @@
         <span class="delivery-bar__chip-icon" aria-hidden="true">🕒</span>
         {{ etaLabel }}
       </span>
-      <span v-if="value === 'sendToMe'" class="delivery-bar__chip">
+      <span v-if="showSwitch && value === 'sendToMe'" class="delivery-bar__chip">
         <span class="delivery-bar__chip-icon" aria-hidden="true">🛵</span>
         {{ shippingText }}
       </span>

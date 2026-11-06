@@ -29,7 +29,7 @@
         📍 محل تحویل حضوری — {{ restaurantAddress || 'موقعیت رستوران روی نقشه' }}
       </template>
       <template v-else>
-        🏪 پین نارنجی = {{ restaurantName }} — 📍 برای آدرس تحویل روی نقشه کلیک کنید یا جستجو کنید.
+        🏪 پین مشکی = {{ restaurantName }} — 📍 برای آدرس تحویل روی نقشه کلیک کنید یا جستجو کنید.
       </template>
     </div>
 
@@ -144,9 +144,9 @@ export default {
     restaurantPinHtml() {
       return (
         '<div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-4px);">' +
-        '<div style="background:#c17f24;color:#fff;font-size:18px;line-height:1;width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.35);border:2px solid #fff;">' +
+        '<div style="background:#1e1819;color:#fff;font-size:18px;line-height:1;width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,0.35);border:2px solid #fff;">' +
         '<span style="transform:rotate(45deg);">🏪</span></div>' +
-        '<div style="margin-top:4px;background:#fff;border:1px solid #c17f24;color:#9a6318;font:700 11px Tahoma;padding:2px 6px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);">رستوران</div>' +
+        '<div style="margin-top:4px;background:#fff;border:1px solid #f0b323;color:#3a2600;background:#f0b323;font:700 11px Tahoma;padding:2px 6px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);">رستوران</div>' +
         '</div>'
       );
     },
@@ -401,7 +401,7 @@ export default {
   border: 1px solid rgba(42, 35, 24, 0.1);
   z-index: 1;
   overflow: hidden;
-  background: #f0ebe3;
+  background: var(--lz-surface-soft);
 }
 
 .map-picker__loading {
@@ -414,7 +414,7 @@ export default {
   gap: 0.5rem;
   background: rgba(247, 243, 235, 0.92);
   font-size: 0.85rem;
-  color: #7a6e62;
+  color: var(--lz-ink-muted);
 }
 
 .map-picker__search {
@@ -431,7 +431,7 @@ export default {
   list-style: none;
   margin: 0.25rem 0 0;
   padding: 0;
-  background: #fff;
+  background: var(--lz-surface);
   border: 1px solid rgba(42, 35, 24, 0.12);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(42, 35, 24, 0.12);
@@ -447,7 +447,7 @@ export default {
 }
 
 .map-picker__suggestions li:hover {
-  background: #f7f3eb;
+  background: var(--lz-surface-light);
 }
 
 .map-picker__suggestions li:last-child {

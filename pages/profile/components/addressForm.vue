@@ -193,8 +193,8 @@ export default {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #f5f5f5;
-  color: #625c55;
+  background: var(--lz-surface-light);
+  color: var(--lz-ink-muted);
   font-size: 1.35rem;
   line-height: 1;
   cursor: pointer;
@@ -202,7 +202,7 @@ export default {
 
 .address-form-modal-header__title {
   margin: 0;
-  color: #2a2318;
+  color: var(--lz-ink);
   font-size: 1.1rem;
   font-weight: 700;
 }
@@ -221,7 +221,7 @@ export default {
   display: block;
   font-size: 0.8rem;
   font-weight: 700;
-  color: #2a2318;
+  color: var(--lz-ink);
   margin-bottom: 0.4rem;
 }
 
@@ -237,7 +237,7 @@ export default {
 
 .form-control:focus {
   outline: none;
-  border-color: #c44536;
+  border-color: var(--lz-accent);
   box-shadow: 0 0 0 2px rgba(196, 69, 54, 0.1);
 }
 
@@ -248,7 +248,7 @@ export default {
 
 .form-hint {
   font-size: 0.75rem;
-  color: #8a7f6d;
+  color: var(--lz-ink-muted);
   margin: 0 0 0.6rem;
 }
 
@@ -256,7 +256,7 @@ export default {
   display: flex;
   align-items: center;
   font-size: 0.85rem;
-  color: #2a2318;
+  color: var(--lz-ink);
   cursor: pointer;
 }
 
@@ -271,7 +271,7 @@ export default {
 }
 
 .btn-primary {
-  background: #c44536;
+  background: var(--lz-accent);
   color: #fff;
 }
 
@@ -282,7 +282,7 @@ export default {
 
 .btn-secondary {
   background: transparent;
-  color: #8a7f6d;
-  border: 1px solid #8a7f6d;
+  color: var(--lz-ink-muted);
+  border: 1px solid var(--lz-ink-muted);
 }
 </style>

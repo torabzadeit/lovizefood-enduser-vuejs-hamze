@@ -16,6 +16,7 @@ fs.writeFileSync(
 
 const env = Object.assign({}, process.env, {
   VUE_APP_BASE_URL: ORIGIN, API_URL: ORIGIN, API_URL_BROWSER: ORIGIN,
+  MAP_IR_API_KEY: 'preview', // turns map.ir features on; the shim answers them
   NODE_OPTIONS: [process.env.NODE_OPTIONS, '--openssl-legacy-provider'].filter(Boolean).join(' '),
 });
 const r = spawnSync('npx', ['nuxt', 'generate', '--config-file', 'dev-mock/nuxt.preview.config.js'], { cwd: root, env, stdio: 'inherit' });

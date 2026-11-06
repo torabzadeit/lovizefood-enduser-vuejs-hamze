@@ -208,7 +208,7 @@ export default {
   border: 1px solid rgba(42, 35, 24, 0.08);
   border-radius: 14px;
   overflow: hidden;
-  background: #fff;
+  background: var(--lz-surface);
 }
 
 .laviz-bill-delivery__row {
@@ -224,7 +224,7 @@ export default {
 
 .laviz-bill-delivery__label {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: var(--lz-ink-muted);
   margin-bottom: 0.35rem;
 }
 
@@ -237,12 +237,12 @@ export default {
 .laviz-bill-delivery__sub {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #6c757d;
+  color: var(--lz-ink-muted);
   margin-top: 0.25rem;
 }
 
 .laviz-bill-card {
-  background: #f7f3eb;
+  background: var(--lz-surface-light);
   border: 1px solid rgba(42, 35, 24, 0.08);
   border-radius: 14px;
   padding: 1rem;
@@ -256,7 +256,7 @@ export default {
   margin-top: 0.75rem;
   padding: 0.85rem 1rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, #9a6318, #c17f24);
+  background: linear-gradient(135deg, var(--lz-accent-deep), var(--lz-accent));
   color: #fff;
   font-weight: 800;
 }

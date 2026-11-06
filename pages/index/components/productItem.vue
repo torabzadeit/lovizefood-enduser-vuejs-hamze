@@ -2,8 +2,18 @@
   <div class="product-card" :class="{ 'product-card--out': isOutOfStock }">
     <!-- Left column: picture on top, the add control directly beneath it. -->
     <div class="product-card__side">
-      <div class="product-card__media" @click="showImageDetailsModal(image)">
+      <div
+        class="product-card__media"
+        :class="{ 'product-card__media--zoomable': hasPhoto }"
+        @click="showImageDetailsModal"
+      >
         <img class="product-card__img" :src="finalImage" alt="" @error="onImageError" />
+        <!-- A small, faint cue that the photo can be opened. -->
+        <span v-if="hasPhoto" class="product-card__zoom" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l5 5M10.5 8v5M8 10.5h5" />
+          </svg>
+        </span>
         <span v-if="isSpecial" class="product-card__badge">غذای روز</span>
       </div>
 
@@ -21,7 +31,7 @@
           </button>
           <div v-else class="product-card__stepper">
             <button type="button" class="product-card__stepper-btn" @click="$emit('decrease')" aria-label="کم کردن">−</button>
-            <span class="product-card__count">{{ count }}</span>
+            <span :key="count" class="product-card__count">{{ count }}</span>
             <button type="button" class="product-card__stepper-btn" @click="$emit('increase')" aria-label="افزودن">+</button>
           </div>
           <!-- The unit (پرس / عدد) sat under the add button and only added
@@ -70,6 +80,9 @@ export default {
     isOutOfStock: { type: Boolean, default: true },
     unit_name: undefined,
     image: String,
+    // The large photo, when the product has one; products without a photo show a placeholder and do not open.
+    fullImage: { type: String, default: '' },
+    hasPhoto: { type: Boolean, default: false },
     isSpecial: { type: Boolean, default: false },
     specialDaysText: { type: String, default: '' },
     ratingAverage: { type: [Number, String], default: 0 },
@@ -79,8 +92,9 @@ export default {
     lockedLabel: { type: String, default: 'فقط در روز خودش' },
   },
   methods: {
-    showImageDetailsModal(imageString) {
-      this.$emit('imageClick', imageString);
+    showImageDetailsModal() {
+      if (!this.hasPhoto) return;
+      this.$emit('imageClick', this.fullImage || this.image);
     },
     // A product whose stored file is missing would otherwise render as a broken
     // image; fall back to the same placeholder used when no image is set.
@@ -107,7 +121,7 @@ export default {
 /* Metrics read from the reference menu row (values are exact, not eyeballed):
    image 104x104, title 16/600/28, description 14/400/24 at 60% ink,
    price 16/600/28 with a 12/600/20 currency suffix, and a 32px-tall add
-   control on #FFEDF6 with #BC0060 text at radius 6. */
+   control on the accent wash with accent text at radius 6. */
 .product-card {
   display: flex;
   align-items: flex-start;
@@ -153,8 +167,8 @@ export default {
   font-size: 12px;
   font-weight: 600;
   line-height: 12px;
-  color: #fff;
-  background: var(--laviz-primary);
+  color: var(--lz-saffron-ink);
+  background: var(--lz-saffron);
   border-radius: 999px;
   padding: 4px 8px;
 }
@@ -183,7 +197,7 @@ export default {
   margin-bottom: 2px;
 }
 
-.product-card__rating-star { color: #ffc700; font-size: 13px; }
+.product-card__rating-star { color: var(--lz-star); font-size: 13px; }
 .product-card__rating small { color: var(--laviz-muted); font-weight: 400; }
 
 .product-card__special {
@@ -239,8 +253,8 @@ export default {
   font-size: 12px;
   font-weight: 600;
   line-height: 12px;
-  color: #fff;
-  background: var(--laviz-primary);
+  color: var(--lz-saffron-ink);
+  background: var(--lz-saffron);
   border-radius: 999px;
   padding: 4px 7px;
 }
@@ -262,8 +276,8 @@ export default {
   padding: 4px 12px;
   border: 0;
   border-radius: 6px;
-  background: var(--laviz-add-bg, #ffedf6);
-  color: var(--laviz-add-ink, #bc0060);
+  background: var(--laviz-add-bg);
+  color: var(--laviz-add-ink);
   font-family: inherit;
   font-size: 16px;
   font-weight: 400;
@@ -275,25 +289,29 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 0;
   min-width: 104px;
-  height: 32px;
-  padding: 4px 12px;
-  background: var(--laviz-add-bg, #ffedf6);
-  color: var(--laviz-add-ink, #bc0060);
+  height: 40px;
+  padding: 0;
+  background: var(--laviz-add-bg);
+  color: var(--laviz-add-ink);
   border-radius: 6px;
 }
 
 .product-card__stepper-btn {
+  flex: 1 1 0;
+  height: 100%;
+  min-width: 40px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
   line-height: 1;
-  width: 18px;
-  height: 24px;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .product-card__count {
@@ -326,11 +344,84 @@ export default {
   white-space: nowrap;
 }
 
-.product-card__out-label { color: var(--laviz-danger); background: #fff0ee; }
+.product-card__out-label { color: var(--laviz-danger); background: var(--lz-danger-wash); }
 .product-card__locked-label { color: var(--laviz-muted); background: var(--laviz-surface-soft, #eeeef0); }
 
 @media (max-width: 360px) {
   .product-card__media,
   .product-card__img { width: 88px; height: 88px; }
+}
+
+/* Motion: the stepper pops in when the first unit is added, the number bumps
+   on every change, and the controls give a little under the finger. */
+.product-card__stepper {
+  animation: stepper-in 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+.product-card__count {
+  display: inline-block;
+  animation: count-bump 0.32s ease;
+}
+
+.product-card__add,
+.product-card__stepper-btn {
+  transition: transform 0.12s ease;
+}
+
+/* The add button is the same 40px-tall touch target as the stepper. */
+.product-card__add {
+  height: 40px;
+}
+
+.product-card__add:active,
+.product-card__stepper-btn:active {
+  transform: scale(0.92);
+}
+
+@keyframes stepper-in {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes count-bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card__stepper,
+  .product-card__count { animation: none; }
+}
+
+/* The photo reads as tappable: a soft shadow, a faint magnifier in the corner,
+   and it gives a little under the finger. */
+.product-card__media {
+  box-shadow: 0 6px 16px rgba(30, 24, 25, 0.26), 0 0 0 1px rgba(30, 24, 25, 0.06);
+}
+
+.product-card__media--zoomable {
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.product-card__media--zoomable:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 6px rgba(30, 24, 25, 0.28), 0 0 0 1px rgba(30, 24, 25, 0.06);
+}
+
+.product-card__zoom {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(30, 24, 25, 0.42);
+  opacity: 0.8;
+  pointer-events: none;
 }
 </style>

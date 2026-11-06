@@ -2,10 +2,12 @@
   <div class="laviz-storefront-shell">
   <b-overlay
     class="laviz-storefront-overlay"
-    :show="loading"
+    :show="loading && products.length > 0"
     :z-index="999">
 
-    <div class="main-fixed-header laviz-app-header" :class="{ 'laviz-app-header--collapsed': headerCollapsed }">
+    <div class="main-fixed-header laviz-app-header"
+         :class="{ 'laviz-app-header--collapsed': headerCollapsed, 'laviz-app-header--hidden': headerHidden }"
+         :style="{ top: headerHidden ? (-headerHideOffset) + 'px' : '0px' }">
       <div class="container">
         <div class="row">
 
@@ -14,25 +16,52 @@
                  Same in the expanded and collapsed header, so nothing jumps on scroll. -->
             <div class="laviz-topbar">
               <div class="laviz-topbar__brand">
-                <img src="@/assets/media/logo.png" class="laviz-topbar__logo" alt=""/>
-                <h1 class="laviz-topbar__title">{{ shopInfo.name }}</h1>
+                <img src="@/assets/media/logo-laviz.png" class="laviz-topbar__logo laviz-topbar__logo--light" alt="لاویز"/>
+                <img src="@/assets/media/logo-laviz-dark.png" class="laviz-topbar__logo laviz-topbar__logo--dark" alt="" aria-hidden="true"/>
+                <!-- The logo already says the name; the heading stays for screen readers and search engines. -->
+                <h1 class="laviz-topbar__title sr-only">{{ shopInfo.name }}</h1>
               </div>
               <div class="laviz-topbar__actions">
                 <button
                   type="button"
                   class="laviz-icon-btn"
+                  :aria-label="theme === 'dark' ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک'"
+                  :title="theme === 'dark' ? 'حالت روشن' : 'حالت تاریک'"
+                  @click="toggleTheme"
+                >
+                  <svg v-if="theme === 'dark'" :key="'sun'" class="laviz-icon-btn__theme" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                    <circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" />
+                  </svg>
+                  <svg v-else :key="'moon'" class="laviz-icon-btn__theme" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="laviz-icon-btn"
                   aria-label="مسیریابی به رستوران"
                   title="مسیریابی به رستوران"
-                  @click="$bvModal.show('modal-navigate')"
+                  @click="openNavigation"
                 >
-                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                  <svg class="laviz-icon-btn__arrow" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
                     <path d="M12 2.5 4.5 20.2c-.2.5.4 1 .9.7L12 17l6.6 3.9c.5.3 1.1-.2.9-.7L12 2.5z"
                           fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
                   </svg>
                 </button>
-                <button v-if="auth.is_login" type="button" class="laviz-user-bar__login" @click="$router.push('/profile')">پروفایل</button>
+                <!-- Signed in: one solid saffron icon button opens the profile (sign-out lives there). -->
+                <button
+                  v-if="auth.is_login"
+                  type="button"
+                  class="laviz-icon-btn laviz-icon-btn--saffron"
+                  aria-label="پروفایل"
+                  title="پروفایل"
+                  @click="$router.push('/profile')"
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="8" r="4" /><path d="M4.5 20.5c.9-3.6 3.9-5.5 7.5-5.5s6.6 1.9 7.5 5.5" />
+                  </svg>
+                </button>
                 <button v-else type="button" class="laviz-user-bar__login" @click="openProfileLogin">ورود</button>
-                <button v-if="auth.is_login" type="button" class="laviz-topbar__logout" @click="logout()">خروج</button>
               </div>
             </div>
             <div v-if="mode === 0 && !headerCollapsed" class="laviz-topbar__ramadan">
@@ -74,7 +103,9 @@
             </div>
           </div>
 
-          <div v-if="!headerCollapsed" class="col-12">
+          <!-- Only worth a row when it has something to say (an ETA); the shipping
+               cost is shown in the basket, not on the first page. -->
+          <div v-if="!headerCollapsed && Number(etaMinutes) > 0" class="col-12">
             <delivery-type-bar
               v-model="delivery_type"
               :options="deliveryTypeOptions"
@@ -174,6 +205,16 @@
 
           <div class="product-content-wrapper">
 
+            <!-- First load: shimmering placeholders hold the menu's shape until the data lands. -->
+            <div v-if="loading && !products.length" class="skeleton-menu" role="status" aria-label="در حال بارگذاری منو">
+              <div class="skeleton-title"></div>
+              <div v-for="n in 5" :key="n" class="skeleton-item">
+                <div class="skeleton-item__img"></div>
+                <div class="skeleton-item__lines">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </div>
             <section
               v-if="hasChefDaily"
               :id="'menu-cat-' + CHEF_TAB_ID"
@@ -198,9 +239,10 @@
                 :key="'content-' + productCategoryItem.id"
                 class="menu-section"
               >
-                <h2 class="menu-section__title">{{ productCategoryItem.text }}</h2>
+                <h2 v-reveal class="menu-section__title section-heading">{{ productCategoryItem.text }}</h2>
                 <div
                   v-for="product of categoryProducts(productCategoryItem.id)"
+                  v-reveal
                   class="order-item"
                   :key="product.name"
                 >
@@ -213,6 +255,8 @@
                       :isOutOfStock="productData[product.key].isOutOfStock"
                       :unit_name="productData[product.key].unit_name"
                       :image="productData[product.key].image"
+                      :fullImage="productData[product.key].imageFull || ''"
+                      :hasPhoto="!!productData[product.key].imageFull"
                       :description="productData[product.key].description"
                       :isSpecial="productData[product.key].isSpecial"
                       :specialDaysText="productData[product.key].specialDaysText"
@@ -220,7 +264,7 @@
                       :ratingCount="productData[product.key].ratingCount"
                       :showRating="showProductRating"
                       @decrease="subProductCount(product.key,productData[product.key].add_unit)"
-                      @increase="addProductCount(product.key,productData[product.key].add_unit)"
+                      @increase="onProductAdd(product.key)"
                       @imageClick="showImageModal"
                     />
                   </template>
@@ -244,18 +288,25 @@
         <div class="laviz-cart-modal__scroll">
         <section class="laviz-section laviz-cart-items">
           <h3 class="laviz-section__title">اقلام سفارش</h3>
-          <div v-for="item in selectedProducts" :key="item.key" class="laviz-cart-line">
-            <div class="laviz-cart-line__info">
-              <span class="laviz-cart-line__name">{{ item.name }}</span>
-              <small class="laviz-cart-line__unit">{{ item.count }} {{ item.unit_name }}</small>
+          <!-- Rows slide into and out of place instead of jumping, and every
+               column has a fixed width so a changing number never moves its
+               neighbours. -->
+          <transition-group name="cart-line" tag="div" class="laviz-cart-lines">
+            <div v-for="item in selectedProducts" :key="item.key" class="laviz-cart-line">
+              <div class="laviz-cart-line__info">
+                <span class="laviz-cart-line__name">{{ item.name }}</span>
+                <small class="laviz-cart-line__unit">{{ item.count }} {{ item.unit_name }}</small>
+                <span class="laviz-cart-line__price"><span :key="item.total" class="laviz-cart-line__price-num">{{ formatNum(item.total) }}</span> تومان</span>
+              </div>
+              <div class="laviz-cart-line__stepper">
+                <button type="button" @click="onCartStep(item.key, -1)" aria-label="کم کردن">−</button>
+                <transition :name="'count-' + countDir" mode="out-in">
+                  <span :key="item.count" class="laviz-cart-line__count">{{ item.count }}</span>
+                </transition>
+                <button type="button" @click="onCartStep(item.key, 1)" aria-label="افزودن">+</button>
+              </div>
             </div>
-            <div class="laviz-cart-line__stepper">
-              <button type="button" @click="subProductCount(item.key, productData[item.key].add_unit)" aria-label="کم کردن">−</button>
-              <span>{{ item.count }}</span>
-              <button type="button" @click="addProductCount(item.key, productData[item.key].add_unit)" aria-label="افزودن">+</button>
-            </div>
-            <span class="laviz-cart-line__price">{{ formatNum(item.total) }} تومان</span>
-          </div>
+          </transition-group>
           <p v-if="!selectedProducts.length" class="laviz-cart-items__empty">سبد خرید خالی است.</p>
         </section>
 
@@ -267,92 +318,72 @@
               زمان و نحوه تحویل
             </h2>
             <div class="d-flex flex-column position-relative">
-              <template
-                v-if="deliveryItems && deliveryItems.length > 0"
-                v-for="(deliveryItem, deliveryIndex) in deliveryItems">
-                <div
-                  @click="dateSelection(deliveryIndex)"
-                  class="laviz-date-option"
+              <p v-if="mode === 0 && deliveryItems.length" class="text-muted small mb-2">
+                {{ 'سفارش امروز فقط تا قبل از ساعت ' + '15:30' }}
+              </p>
+              <!-- Three day buttons. The chosen one also names the weekday
+                   ("امروز سه‌شنبه"); the others stay short ("فردا"). -->
+              <div v-if="deliveryItems && deliveryItems.length" class="laviz-day-switch" role="radiogroup" aria-label="روز تحویل">
+                <button
+                  v-for="(deliveryItem, deliveryIndex) in deliveryItems"
+                  :key="deliveryIndex"
+                  type="button"
+                  role="radio"
+                  class="laviz-day"
                   :class="{
-                    'laviz-date-option--active': delivery_date === deliveryIndex,
-                    'laviz-date-option--disabled': !deliveryItem.status
+                    'laviz-day--active': delivery_date === deliveryIndex,
+                    'laviz-day--disabled': !deliveryItem.status
                   }"
+                  :aria-checked="delivery_date === deliveryIndex"
+                  :disabled="!deliveryItem.status"
+                  @click="dateSelection(deliveryIndex)"
                 >
-                  <div
-                    v-if="deliveryIndex == 0 && mode === 0"
-                    class="text-muted mb-2 small">
-                    {{ 'سفارش امروز فقط تا قبل از ساعت ' + '15:30' }}
-                  </div>
-                  <label :for="'delivery-' + deliveryIndex">
-                <span
-                  :class="{ 'text-muted': !deliveryItem.status}">{{ getDeliveryItemText(deliveryIndex)+': ' }}</span>
-                    <span :class="{ 'text-muted': !deliveryItem.status }">{{
-                        jalaliDate(deliveryItem.date, "ddd jD jMMMM jYYYY")
-                      }}</span>
-                    <input
-                      type="radio"
-                      class="mr-1"
-                      :id="'delivery-' + deliveryIndex"
-                      v-model="delivery_date"
-                      :value="deliveryIndex"
-                      :disabled="!deliveryItem.status"
-                    />
-
-                    <span
-                      v-if="deliveryItem.discount_special_day"
-                      class="text-danger mr-1"
-                      style="font-size: 13px"
-                    >
-                  تخفیف ویژه %
-                  {{
-                        Number(deliveryItem.discount_special_day) +
-                        Number(deliveryItem.discount_percent)
-                      }}
-                </span>
-                    <span v-else>
-                  <span
-                    class="text-success mr-1"
-                    style="font-size: 13px"
-                    v-if="deliveryItem.discount_percent"
-                  >
+                  <span class="laviz-day__label">{{
+                    delivery_date === deliveryIndex
+                      ? getDeliveryItemText(deliveryIndex) + ' ' + jalaliDate(deliveryItem.date, 'dddd')
+                      : getDeliveryItemText(deliveryIndex)
+                  }}</span>
+                  <small v-if="!deliveryItem.status" class="laviz-day__note">
+                    {{ deliveryIndex === 0 ? 'پایان سفارش' : 'تعطیل' }}
+                  </small>
+                  <small v-else-if="deliveryItem.discount_special_day" class="laviz-day__note laviz-day__note--discount">
+                    تخفیف ویژه {{ Number(deliveryItem.discount_special_day) + Number(deliveryItem.discount_percent) }}٪
+                  </small>
+                  <small v-else-if="deliveryItem.discount_percent" class="laviz-day__note laviz-day__note--discount">
                     {{ deliveryItem.discount_percent }}٪ تخفیف
-                  </span>
-                </span>
-                    <!-- Only the first card is "today"; the others are closed
-                         days, so the wording has to follow the index. -->
-                    <div
-                      class="text-muted mr-1"
-                      style="font-size: 13px"
-                      v-if="!deliveryItem.status"
-                    >
-                      {{ deliveryIndex === 0 ? 'سفارش برای امروز به پایان رسیده' : 'این روز تعطیل است' }}
-                    </div>
-                  </label>
-                </div>
-
-              </template>
-
-              <div v-if="delivery_date !== -1 && deliveryTimes.length > 1" class="mt-3">
-                <label class="laviz-field-label">ساعت تحویل</label>
-                <div class="laviz-time-slots" role="listbox" aria-label="ساعت تحویل">
-                  <button
-                    v-for="opt in deliveryTimes"
-                    :key="opt.value"
-                    type="button"
-                    class="laviz-time-slot"
-                    :class="{ 'laviz-time-slot--active': delivery_time === opt.value }"
-                    role="option"
-                    :aria-selected="delivery_time === opt.value"
-                    @click="delivery_time = opt.value"
-                  >
-                    {{ opt.text }}
-                  </button>
-                </div>
+                  </small>
+                </button>
               </div>
-              <div v-else-if="delivery_date !== -1 && deliveryTimes.length === 1" class="mt-3">
+
+              <div v-if="delivery_date !== -1 && deliveryTimes.length" class="mt-3">
                 <label class="laviz-field-label">ساعت تحویل</label>
-                <div class="laviz-time-slot laviz-time-slot--active laviz-time-slot--readonly">
-                  {{ deliveryTimes[0].text }}
+                <div class="laviz-day-switch laviz-day-switch--two" role="radiogroup" aria-label="ساعت تحویل">
+                  <button
+                    type="button"
+                    role="radio"
+                    class="laviz-day"
+                    :class="{ 'laviz-day--active': timeMode === 'asap' }"
+                    :aria-checked="timeMode === 'asap'"
+                    @click="chooseAsapTime"
+                  >
+                    <span class="laviz-day__label">تحویل فوری</span>
+                    <small class="laviz-day__note">نزدیک‌ترین زمان: {{ faTime(deliveryTimes[0].value) }}</small>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    class="laviz-day"
+                    :class="{ 'laviz-day--active': timeMode === 'scheduled' }"
+                    :aria-checked="timeMode === 'scheduled'"
+                    @click="timeSheetOpen = true"
+                  >
+                    <span class="laviz-day__label">{{
+                      timeMode === 'scheduled' && delivery_time
+                        ? 'تحویل ساعت ' + faTime(delivery_time)
+                        : 'تحویل در ساعت انتخابی'
+                    }}</span>
+                    <small v-if="timeMode === 'scheduled'" class="laviz-day__note">تغییر ساعت</small>
+                  </button>
                 </div>
               </div>
 
@@ -425,21 +456,43 @@
                   class="form-control"
                   rows="3"
                   v-model="delivery_address"
+                  aria-label="آدرس تحویل"
+                  placeholder="شهر، خیابان، کوچه ..."
                 ></textarea>
-                <label class="small font-weight-bold mt-2 d-block">انتخاب موقعیت روی نقشه</label>
-                <client-only>
-                  <map-picker
-                    ref="deliveryMap"
-                    :lat.sync="delivery_lat"
-                    :lng.sync="delivery_lng"
-                    :center-lat="mapCenter.lat"
-                    :center-lng="mapCenter.lng"
-                    :restaurant-name="mapCenter.name || 'رستوران لاویز'"
-                    :restaurant-address="mapCenter.address"
-                    @change="recalcShippingPreview"
-                    @address="onMapAddress"
+
+                <!-- Title and field share one row. -->
+                <div class="laviz-inline-field mt-3">
+                  <label class="laviz-inline-field__label" for="delivery-plaque">
+                    پلاک <span class="laviz-inline-field__hint">(اختیاری)</span>
+                  </label>
+                  <input
+                    id="delivery-plaque"
+                    type="text"
+                    class="form-control"
+                    v-model.trim="plaque"
+                    maxlength="20"
+                    autocomplete="off"
+                    placeholder="مثلا ۱۲"
                   />
-                </client-only>
+                </div>
+
+                <map-preview
+                  v-if="delivery_lat != null && delivery_lng != null"
+                  class="mt-3"
+                  :lat="Number(delivery_lat)"
+                  :lng="Number(delivery_lng)"
+                  @edit="mapModalOpen = true"
+                />
+                <template v-else>
+                  <p class="laviz-map-hint">برای تسریع در زمان دریافت موقعیت، آدرس خود را روی نقشه نیز وارد نمایید.</p>
+                  <button type="button" class="laviz-map-trigger" @click="mapModalOpen = true">
+                    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                      <path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                      <circle cx="12" cy="10" r="2.3" fill="currentColor"/>
+                    </svg>
+                    <span>تعیین آدرس روی نقشه</span>
+                  </button>
+                </template>
               </div>
             </div>
           </section>
@@ -510,7 +563,7 @@
               class="text-success mt-2 small"
               v-if="discountCode.code_valid_status"
             >
-              {{ discountCode.discount_percent }}٪ تخفیف اعمال شد
+              {{ formatNum(Math.round(bill.discount_amount)) }} تومان تخفیف اعمال شد
             </div>
           </section>
         </div>
@@ -630,12 +683,15 @@
         <div class="laviz-cart-modal__cta">
           <div class="laviz-cart-modal__total">
             <small>مبلغ قابل پرداخت</small>
-            <strong>{{ formatNum(bill.payment_amount) }} تومان</strong>
+            <strong :key="bill.payment_amount" class="laviz-total-tick">{{ formatNum(bill.payment_amount) }} تومان</strong>
+            <!-- Says why the button is off, in the spot the eye is already on. -->
+            <small v-if="auth.is_login && addressMissing" class="laviz-cart-modal__hint" role="status">آدرس تحویل را وارد کنید</small>
           </div>
           <button
             v-if="auth.is_login"
             type="button"
             class="laviz-btn-pay"
+            :disabled="addressMissing"
             @click="order()"
           >پرداخت و ثبت سفارش</button>
           <button
@@ -702,11 +758,23 @@
           />
         </a>
       </footer>
-      <navigate-sheet
-        :lat="Number(mapCenter.lat)"
-        :lng="Number(mapCenter.lng)"
-        :name="shopInfo.name"
-        :address="shopInfo.address"
+      <delivery-time-sheet
+        :visible.sync="timeSheetOpen"
+        :times="(deliveryItems[delivery_date] && deliveryItems[delivery_date].deliveryTimes) || []"
+        :value="timeMode === 'scheduled' ? delivery_time : null"
+        :day-label="timeSheetDayLabel"
+        @select="onTimePicked"
+      />
+      <map-picker-modal
+        :open="mapModalOpen"
+        :lat="delivery_lat"
+        :lng="delivery_lng"
+        :center-lat="Number(mapCenter.lat)"
+        :center-lng="Number(mapCenter.lng)"
+        :restaurant-name="shopInfo.name"
+        :restaurant-address="shopInfo.address"
+        @confirm="onMapConfirm"
+        @close="mapModalOpen = false"
       />
       <success-login-modal
         @order="order"
@@ -725,7 +793,7 @@
         :delivery_date="deliveryItems[delivery_date]? deliveryItems[delivery_date].date: null"
         :delivery_time="delivery_time"
         :check_one="check_one"
-        :delivery_address="delivery_address"
+        :delivery_address="fullDeliveryAddress"
         :shipping-cost="shippingCost"
         :discount-code="discountCode"
         :delivery_type="delivery_type"
@@ -740,7 +808,7 @@
         :map-center="mapCenter"
         @addresses-changed="refreshSavedAddresses"
       />
-      <image-details-modal :src="modal.image"/>
+      <image-details-modal :visible.sync="imageOpen" :src="modal.image"/>
       <pwa-call-out :text="pwaCallOutText"/>
     </div>
 
@@ -756,7 +824,11 @@ import 'moment/locale/fa'  // برای فارسی
 moment.locale('fa')
 import PwaCallOut from "../components/pwa-call-out.vue";
 import SuccessLoginModal from "./index/components/successLoginModal.vue";
-import NavigateSheet from "./index/components/navigateSheet.vue";
+import MapPickerModal from "~/components/MapPickerModal.vue";
+import MapPreview from "~/components/MapPreview.vue";
+import reveal from "../utils/reveal";
+import { trackTaps, flyToCart, reducedMotion } from "../utils/motion";
+import DeliveryTimeSheet from "./index/components/deliveryTimeSheet.vue";
 import RegisterModal from "./index/components/registerModal.vue";
 import BillModal from "./index/components/billModal.vue";
 import Vue from "vue";
@@ -786,7 +858,8 @@ moment.loadPersian(true, {dialect: "persian-modern"});
 
 export default {
   name: "index",
-  components: {NavigateSheet, ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
+  directives: {reveal},
+  components: {DeliveryTimeSheet, MapPickerModal, MapPreview, ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
   data() {
     return {
       modal: {
@@ -798,6 +871,13 @@ export default {
       taxEnabled: false,
       taxPercent: 0,
       delivery_lat: null,
+      plaque: '',
+      timeMode: 'asap', // 'asap' = earliest slot, 'scheduled' = picked in the sheet
+      timeSheetOpen: false,
+      mapModalOpen: false,
+      imageOpen: false,
+      countDir: 'up', // direction of the last quantity change, for the number roll
+      theme: 'light', // 'light' | 'dark'; mirrors <html data-theme>, set before paint by app.html
       delivery_lng: null,
       selectedAddressId: null,
       orderComment: '',
@@ -883,6 +963,11 @@ export default {
       // component instance owns them and they are torn down with it).
       menuSheetVisible: false,
       headerCollapsed: false,
+      // Scroll down hides everything above the category tabs; the first scroll
+      // up brings it back. The tabs stay pinned either way.
+      headerHidden: false,
+      headerHideOffset: 0,
+      lastScrollY: 0,
       headerHeight: 264,
       searchOpen: false,
       menuSearch: '',
@@ -940,12 +1025,23 @@ export default {
       this.loadCurrentOrder();
     }
 
+    trackTaps();
+    this.theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    this.syncThemeColor();
     this.$nextTick(this.syncHeaderHeight);
+    // The header changes height as data arrives (chips, banners) and when the
+    // viewport changes; keep the spacer under it in step so no content hides.
+    const headerEl = document.querySelector('.main-fixed-header');
+    if (headerEl && window.ResizeObserver) {
+      this.headerObserver = new ResizeObserver(() => this.syncHeaderHeight());
+      this.headerObserver.observe(headerEl);
+    }
     window.addEventListener('scroll', this.onMenuScroll, { passive: true });
     window.addEventListener('resize', this.onMenuScroll, { passive: true });
   },
 
   beforeDestroy() {
+    if (this.headerObserver) this.headerObserver.disconnect();
     if (process.client) document.body.style.overflow = '';
     window.removeEventListener('scroll', this.onMenuScroll);
     window.removeEventListener('resize', this.onMenuScroll);
@@ -967,13 +1063,99 @@ export default {
     },
     pickSavedAddress(addr) {
       this.selectedAddressId = addr.id;
+      this.plaque = ''; // a saved address already carries its plaque in the text
       this.delivery_address = addr.address;
       this.delivery_lat = addr.lat;
       this.delivery_lng = addr.lng;
       this.recalcShippingPreview();
     },
-    onMapAddress(addr) {
-      if (addr) this.delivery_address = addr;
+    /** Light/dark switch. The choice is kept on this device (localStorage, with a
+     *  cookie as a fallback) and read back by the script in app.html on the next load. */
+    toggleTheme(event) {
+      const next = this.theme === 'dark' ? 'light' : 'dark';
+      const root = document.documentElement;
+      const apply = () => {
+        root.setAttribute('data-theme', next);
+        this.theme = next;
+        try { localStorage.setItem('laviz_theme', next); } catch (e) { /* private mode */ }
+        document.cookie = `laviz_theme=${next}; max-age=31536000; path=/; SameSite=Lax`;
+        this.syncThemeColor();
+      };
+
+      // Transitioning each element's colours separately made borders and
+      // backgrounds change at different moments. Instead the browser takes a
+      // picture of the old page and the new theme grows over it from the
+      // button, so every line and fill changes together. Browsers without the
+      // View Transitions API simply switch at once.
+      if (typeof document.startViewTransition !== 'function' || reducedMotion()) {
+        apply();
+        return;
+      }
+      const button = event && event.currentTarget && event.currentTarget.getBoundingClientRect
+        ? event.currentTarget.getBoundingClientRect()
+        : null;
+      const x = button ? button.left + button.width / 2 : window.innerWidth / 2;
+      const y = button ? button.top + button.height / 2 : 0;
+      const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+      const transition = document.startViewTransition(async () => {
+        apply();
+        await this.$nextTick();
+      });
+      transition.ready.then(() => {
+        root.animate(
+          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+          { duration: 560, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' },
+        );
+      }).catch(() => { /* a skipped transition still ends in the new theme */ });
+    },
+    /** Browser chrome (status bar / address bar) follows the theme. */
+    syncThemeColor() {
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', this.theme === 'dark' ? '#17181a' : '#ffffff');
+    },
+    /** + / − in the basket: a light tap on phones that support it, and a rolling number. */
+    onCartStep(key, direction) {
+      const item = this.productData[key];
+      if (!item) return;
+      this.countDir = direction > 0 ? 'up' : 'down';
+      if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) { /* not allowed */ } }
+      if (direction > 0) this.addProductCount(key, item.add_unit);
+      else this.subProductCount(key, item.add_unit);
+    },
+    /** Adds one unit from the menu and, if it took, lets a dot fly to the basket. */
+    onProductAdd(key) {
+      const item = this.productData[key];
+      if (!item) return;
+      const before = item.count;
+      this.addProductCount(key, item.add_unit);
+      if (item.count > before) this.$nextTick(() => { if (!this.cartOpen) flyToCart(); });
+    },
+    /** Opens the phone's own navigation to the restaurant: on Android the
+     *  system offers every installed map app, on iOS Apple Maps opens, and on a
+     *  computer Google Maps opens in a new tab. */
+    openNavigation() {
+      const lat = Number(this.mapCenter.lat);
+      const lng = Number(this.mapCenter.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const name = encodeURIComponent(this.shopInfo.name || '');
+      const ua = navigator.userAgent || '';
+      const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (/android/i.test(ua)) {
+        window.location.href = `geo:${lat},${lng}?q=${lat},${lng}(${name})`;
+      } else if (isIOS) {
+        window.location.href = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d&q=${name}`;
+      } else {
+        window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank', 'noopener');
+      }
+    },
+    /** The customer confirmed a spot on the full-screen map. */
+    onMapConfirm({ lat, lng }) {
+      this.delivery_lat = lat;
+      this.delivery_lng = lng;
+      this.selectedAddressId = null; // the position no longer matches a saved address
+      // The typed address is the customer's own words: the map never edits it.
+      this.mapModalOpen = false;
+      this.recalcShippingPreview();
     },
     async refreshSavedAddresses() {
       if (!this.auth.is_login) return;
@@ -1068,7 +1250,7 @@ export default {
     },
     addChefDailyProduct(productKey) {
       const product = this.productData[productKey];
-      if (product) this.addProductCount(productKey, product.add_unit);
+      if (product) this.onProductAdd(productKey);
     },
     subChefDailyProduct(productKey) {
       const product = this.productData[productKey];
@@ -1127,15 +1309,24 @@ export default {
 
     // The fixed header covers the top of the viewport, so the "current"
     // section is judged against a line just below it rather than against 0.
-    headerOffset() {
+    headerOffset(goingDown) {
       const header = document.querySelector('.main-fixed-header');
-      return (header ? header.offsetHeight : 0) + 12;
+      if (!header) return 12;
+      const full = header.offsetHeight;
+      // `goingDown` is passed for programmatic scrolls: the header is about to
+      // hide (or show), so aim for the line it will have, not the current one.
+      const hidden = goingDown === undefined ? this.headerHidden : goingDown;
+      return (hidden ? full - this.headerHideOffset : full) + 12;
     },
 
     /** Keeps the spacer in step with the header as it collapses and expands. */
     syncHeaderHeight() {
       const header = document.querySelector('.main-fixed-header');
-      if (header && header.offsetHeight !== this.headerHeight) {
+      if (!header) return;
+      // Everything above the category tabs is what slides away.
+      const tabs = header.querySelector('.laviz-tabs');
+      this.headerHideOffset = tabs ? tabs.offsetTop : 0;
+      if (header.offsetHeight !== this.headerHeight) {
         this.headerHeight = header.offsetHeight;
       }
     },
@@ -1147,7 +1338,9 @@ export default {
       // handler takes over again — otherwise it fights the smooth animation.
       this.currentActiveTabId = categoryId;
       this.suppressScrollSpy = true;
-      const top = el.getBoundingClientRect().top + window.pageYOffset - this.headerOffset();
+      const target = el.getBoundingClientRect().top + window.pageYOffset;
+      const goingDown = target > window.pageYOffset + this.headerOffset();
+      const top = target - this.headerOffset(goingDown);
       window.scrollTo({ top, behavior: 'smooth' });
       clearTimeout(this.scrollSpyTimer);
       this.scrollSpyTimer = setTimeout(() => {
@@ -1192,12 +1385,21 @@ export default {
       });
     },
 
-    /** Collapse the header once the customer has scrolled past the brand block.
-     *  Hysteresis (80 down / 40 up) stops it flickering at the threshold. */
+    /** Hide the header on the way down, show it again on the first move up.
+     *  Small deadbands (6px down / 4px up) keep touch jitter from flickering it. */
     updateHeaderCollapse() {
-      const y = window.pageYOffset;
-      if (!this.headerCollapsed && y > 80) this.headerCollapsed = true;
-      else if (this.headerCollapsed && y < 40) this.headerCollapsed = false;
+      const y = Math.max(0, window.pageYOffset);
+      const dy = y - this.lastScrollY;
+      if (y <= 10) {
+        this.headerHidden = false;
+        this.lastScrollY = y;
+      } else if (dy > 6 && y > this.headerHideOffset) {
+        this.headerHidden = true;
+        this.lastScrollY = y;
+      } else if (dy < -4) {
+        this.headerHidden = false;
+        this.lastScrollY = y;
+      }
     },
     async initialize() {
       this.loading = true;
@@ -1211,6 +1413,16 @@ export default {
         }
         if (!this.deliveryTypeOptions.some(option => option.value === this.delivery_type)) {
           this.delivery_type = this.deliveryTypeOptions[0].value;
+        }
+        // Defaults on entry: delivery ("برام ارسال کنید") and the first day that
+        // can still take orders (today when it is open), so the basket opens
+        // with both choices already made.
+        if (this.deliveryTypeOptions.some(option => option.value === 'sendToMe')) {
+          this.delivery_type = 'sendToMe';
+        }
+        if (this.delivery_date === -1) {
+          const firstOpenDay = this.deliveryItems.findIndex(day => day.status);
+          if (firstOpenDay !== -1) this.delivery_date = firstOpenDay;
         }
         this.shippingCost = resp.data.shippingCost;
         this.delivery_address = resp.data.address;
@@ -1377,8 +1589,9 @@ export default {
       let subtotal = beforeTax + this.bill.tax_amount;
 
       if (this.discountCode.code_valid_status) {
-        this.bill.discount_amount =
-          (subtotal / 100) * this.discountCode.discount_percent;
+        this.bill.discount_amount = Math.round(
+          (subtotal / 100) * this.discountCode.discount_percent
+        );
       }
 
       this.bill.payment_amount = Math.max(0, subtotal - this.bill.discount_amount);
@@ -1455,6 +1668,7 @@ export default {
         return false;
       }
 
+
       if (this.delivery_type == "iWillCome" && !this.delivery_time) {
         if (this.deliveryTimes.length > 1) {
           this.$bvToast.toast("لطفاً ساعت تحویل را انتخاب کنید", { variant: "danger" });
@@ -1481,7 +1695,7 @@ export default {
           delivery_type: this.delivery_type,
           delivery_time: this.delivery_time,
           check_one: this.check_one,
-          delivery_address: this.delivery_address,
+          delivery_address: this.fullDeliveryAddress,
           delivery_lat: this.delivery_lat,
           delivery_lng: this.delivery_lng,
           discount_code: this.discountCode.code,
@@ -1641,17 +1855,31 @@ export default {
     },
     setDeliveryTimeItems(index) {
       this.delivery_time = null;
+      this.timeMode = 'asap';
       const times = this.deliveryItems[index]?.deliveryTimes || [];
       this.deliveryTimes = times.map((f) => ({ value: f, text: f }));
-      if (this.deliveryTimes.length === 1) {
+      // "Delivery as soon as possible" is the default: the earliest slot of the
+      // day (the list arrives in time order). A day's hours can differ from the
+      // next day's, so a chosen time never carries over to another day.
+      if (this.deliveryTimes.length >= 1) {
         this.delivery_time = this.deliveryTimes[0].value;
       }
     },
+    chooseAsapTime() {
+      this.timeMode = 'asap';
+      if (this.deliveryTimes.length) this.delivery_time = this.deliveryTimes[0].value;
+    },
+    onTimePicked(time) {
+      this.delivery_time = time;
+      this.timeMode = 'scheduled';
+    },
+    faTime(value) {
+      return String(value || '').replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d]);
+    },
     showImageModal(imageSrc) {
+      if (!imageSrc) return;
       this.modal.image = imageSrc;
-      if (!imageSrc)
-        return
-      this.$bvModal.show("image-details-modal");
+      this.imageOpen = true;
     },
     removeProduct(pKey) {
       this.display_product = false;
@@ -1686,6 +1914,21 @@ export default {
     }
   },
   computed: {
+    // Delivery needs an address; pick-up does not.
+    addressMissing() {
+      return this.delivery_type === 'sendToMe' && !(this.delivery_address || '').trim();
+    },
+    timeSheetDayLabel() {
+      const item = this.deliveryItems[this.delivery_date];
+      if (!item) return '';
+      return `${this.getDeliveryItemText(this.delivery_date)} ${this.jalaliDate(item.date, 'dddd')}`;
+    },
+    // The API has a single address string, so the plaque is appended to it.
+    fullDeliveryAddress() {
+      const text = (this.delivery_address || '').trim();
+      const plaque = (this.plaque || '').trim();
+      return plaque ? `${text}، پلاک ${plaque}` : text;
+    },
     showCategoryTabs() {
       const cats = this.menuNavCategories;
       return cats.length > 1;

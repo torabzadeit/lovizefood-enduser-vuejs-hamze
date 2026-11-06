@@ -5,7 +5,7 @@
   <section v-if="offers.length" class="offers">
     <h2 class="offers__title">تخفیف‌ها و کوپن‌ها</h2>
 
-    <div class="offers__list">
+    <div v-drag-scroll class="offers__list">
       <button
         v-for="offer in offers"
         :key="offer.id"
@@ -63,8 +63,11 @@
 </template>
 
 <script>
+import dragScroll from '../../../utils/dragScroll';
+
 export default {
   name: 'DiscountSection',
+  directives: { dragScroll },
   props: {
     /** Codes issued to this customer, from /profile/active-discount-codes. */
     personalCodes: { type: Array, default: () => [] },
@@ -238,7 +241,7 @@ export default {
   position: fixed;
   inset: 0;
   z-index: 1035;
-  background: rgba(0, 0, 0, 0.32);
+  background: var(--lz-modal-backdrop);
   display: flex;
   align-items: flex-end;
 }
@@ -247,7 +250,10 @@ export default {
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
-  background: var(--lz-surface);
+  background: var(--lz-surface-raised);
+  border: 1px solid var(--lz-sheet-border);
+  border-bottom: 0;
+  box-shadow: var(--lz-shadow-sheet);
   border-radius: var(--lz-radius-card) var(--lz-radius-card) 0 0;
   padding: var(--lz-space-2) var(--lz-space-4) calc(var(--lz-space-4) + env(safe-area-inset-bottom));
 }

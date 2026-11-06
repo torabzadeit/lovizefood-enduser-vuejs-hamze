@@ -15,7 +15,7 @@
       </svg>
     </button>
 
-    <nav ref="strip" class="menu-nav" aria-label="دسته‌بندی منو">
+    <nav ref="strip" v-drag-scroll class="menu-nav" aria-label="دسته‌بندی منو">
       <button
         v-for="cat in categories"
         :key="cat.id"
@@ -33,8 +33,11 @@
 </template>
 
 <script>
+import dragScroll from '../../../utils/dragScroll';
+
 export default {
   name: 'MenuCategoryNav',
+  directives: { dragScroll },
   props: {
     categories: { type: Array, default: () => [] },
     activeId: { type: String, default: null },
@@ -139,8 +142,9 @@ export default {
   bottom: 0;
   height: 3px;
   border-radius: 3px 3px 0 0;
-  background: transparent;
-  transition: background 0.2s ease;
+  background: var(--laviz-primary);
+  transform: scaleX(0);
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
 .menu-nav__chip--active {
@@ -149,7 +153,11 @@ export default {
 }
 
 .menu-nav__chip--active::after {
-  background: var(--laviz-text);
+  transform: scaleX(1);
+}
+
+.menu-nav__chip:active {
+  opacity: 0.7;
 }
 
 /* The strip is scrolled programmatically as the page moves; hiding the native

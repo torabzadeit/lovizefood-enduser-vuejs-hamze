@@ -7,7 +7,7 @@
 
   P.open = function (method, url) {
     var u = String(url);
-    this.__mock = u.indexOf(ORIGIN) === 0 ? { m: String(method).toUpperCase(), p: new URL(u).pathname } : null;
+    this.__mock = u.indexOf(ORIGIN) === 0 ? { m: String(method).toUpperCase(), p: new URL(u).pathname, u: u } : null;
     return realOpen.apply(this, arguments);
   };
   P.send = function (body) {
@@ -15,7 +15,7 @@
     if (!mk) return realSend.apply(this, arguments);
     var self = this, parsed = {};
     try { parsed = body ? JSON.parse(body) : {}; } catch (e) {}
-    var out = mock.handle(mk.m, mk.p, parsed) || { status: 404, body: { statusCode: 404, message: 'mock: not implemented' } };
+    var out = mock.handle(mk.m, mk.p, parsed, new URL(mk.u).searchParams) || { status: 404, body: { statusCode: 404, message: 'mock: not implemented' } };
     var text = JSON.stringify(out.body);
     setTimeout(function () {
       function def(k, v) { Object.defineProperty(self, k, { value: v, configurable: true }); }
@@ -44,4 +44,66 @@
       });
     });
   }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
+
+  // ---- map.ir stand-in -----------------------------------------------------
+  // The preview has no network access to map.ir. Tiles become a generic street
+  // grid, search covers a few Qaen places, reverse geocoding names the nearest
+  // one. None of this is real map data; it only lets the map UI be exercised.
+  var PLACES = [
+    { title: 'بلوار بسیج', lat: 33.7335, lng: 59.1835 },
+    { title: 'خیابان بصیرت', lat: 33.7322, lng: 59.1815 },
+    { title: 'میدان شهدا', lat: 33.7340, lng: 59.1870 },
+    { title: 'بیمارستان امام علی', lat: 33.7276, lng: 59.1838 },
+    { title: 'پارک ملت', lat: 33.7300, lng: 59.1790 },
+    { title: 'ترمینال مسافربری', lat: 33.7210, lng: 59.1750 },
+    { title: 'میدان آزادی، مشهد', lat: 36.2972, lng: 59.6067 }
+  ];
+  function jsonResponse(obj) {
+    return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+  function paintTile(url) {
+    var q = new URL(url).searchParams, bbox = (q.get('bbox') || q.get('BBOX') || '0,0,1,1').split(',').map(Number);
+    var minx = bbox[0], miny = bbox[1], span = bbox[2] - bbox[0], N = 256, k = N / span;
+    var c = document.createElement('canvas'); c.width = c.height = N;
+    var g = c.getContext('2d');
+    g.fillStyle = '#eceee6'; g.fillRect(0, 0, N, N);
+    var CELL = 180, x0 = Math.floor(minx / CELL), x1 = Math.ceil((minx + span) / CELL);
+    var y0 = Math.floor(miny / CELL), y1 = Math.ceil((miny + span) / CELL);
+    function px(X) { return (X - minx) * k; }
+    function py(Y) { return N - (Y - miny) * k; }
+    for (var ix = x0; ix <= x1; ix++) for (var iy = y0; iy <= y1; iy++) {
+      var h = Math.abs((ix * 73856093) ^ (iy * 19349663)) % 11;
+      if (h === 0) { g.fillStyle = '#cfe6c6'; g.fillRect(px(ix * CELL), py((iy + 1) * CELL), CELL * k, CELL * k); }
+      else if (h < 4) { g.fillStyle = '#e3e1d8'; g.fillRect(px(ix * CELL) + 6 * k, py((iy + 1) * CELL) + 6 * k, (CELL - 12) * k, (CELL - 12) * k); }
+    }
+    g.fillStyle = '#ffffff';
+    for (var i = x0; i <= x1; i++) g.fillRect(px(i * CELL) - Math.max(1.5, 7 * k) / 2, 0, Math.max(1.5, 7 * k), N);
+    for (var j = y0; j <= y1; j++) g.fillRect(0, py(j * CELL) - Math.max(1.5, 7 * k) / 2, N, Math.max(1.5, 7 * k));
+    g.fillStyle = '#fbe3a0';
+    for (var a = Math.floor(minx / (CELL * 5)); a <= Math.ceil((minx + span) / (CELL * 5)); a++) g.fillRect(px(a * CELL * 5) - Math.max(3, 16 * k) / 2, 0, Math.max(3, 16 * k), N);
+    for (var b = Math.floor(miny / (CELL * 5)); b <= Math.ceil((miny + span) / (CELL * 5)); b++) g.fillRect(0, py(b * CELL * 5) - Math.max(3, 16 * k) / 2, N, Math.max(3, 16 * k));
+    return new Promise(function (resolve) {
+      c.toBlob(function (blob) { resolve(new Response(blob, { status: 200, headers: { 'Content-Type': 'image/png' } })); }, 'image/png');
+    });
+  }
+  var realFetch = window.fetch;
+  window.fetch = function (input, init) {
+    var u = typeof input === 'string' ? input : (input && input.url) || '';
+    if (u.indexOf('https://map.ir/') !== 0) return realFetch.apply(this, arguments);
+    if (u.indexOf('/shiveh/wms') !== -1) return paintTile(u);
+    var url = new URL(u);
+    if (url.pathname.indexOf('/search') === 0) {
+      var text = (url.searchParams.get('text') || '').trim();
+      var hits = PLACES.filter(function (p) { return p.title.indexOf(text) !== -1; }).map(function (p) {
+        return { title: p.title, address: p.title.indexOf('مشهد') !== -1 ? p.title : 'قائن، ' + p.title, geom: { coordinates: [p.lng, p.lat] } };
+      });
+      return Promise.resolve(jsonResponse({ value: hits }));
+    }
+    if (url.pathname.indexOf('/reverse') === 0) {
+      var la = +url.searchParams.get('lat'), lo = +url.searchParams.get('lon'), best = PLACES[0], bd = 1e9;
+      PLACES.forEach(function (p) { var d = Math.hypot(p.lat - la, p.lng - lo); if (d < bd) { bd = d; best = p; } });
+      return Promise.resolve(jsonResponse({ address: 'قائن، نزدیک ' + best.title }));
+    }
+    return Promise.resolve(new Response('{}', { status: 404 }));
+  };
 })();

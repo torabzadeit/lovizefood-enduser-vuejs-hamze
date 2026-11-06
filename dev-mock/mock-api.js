@@ -36,7 +36,7 @@ http.createServer((req, res) => {
   req.on('end', () => {
     let body = {};
     try { body = raw ? JSON.parse(raw) : {}; } catch (e) { /* ignore */ }
-    const out = mock.handle(req.method, pathname, body);
+    const out = mock.handle(req.method, pathname, body, new URL(req.url, 'http://x').searchParams);
     console.log(req.method, pathname, out ? '' : '(not mocked -> 404)');
     if (!out) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
