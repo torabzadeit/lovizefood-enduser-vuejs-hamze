@@ -287,7 +287,7 @@
 
         <div class="laviz-cart-modal__scroll">
         <section class="laviz-section laviz-cart-items">
-          <h3 class="laviz-section__title">اقلام سفارش</h3>
+          <h3 class="laviz-section__title">خرید شما</h3>
           <!-- Rows slide into and out of place instead of jumping, and every
                column has a fixed width so a changing number never moves its
                neighbours. -->
@@ -571,7 +571,7 @@
   <!-- <div class="col-md-12 mt-2" v-if="selectedProducts.length > 0">
     <div class="content-box p-3 bg-light">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <strong>محصولات انتخاب شده:</strong>
+        <strong>خرید شما:</strong>
         <b-badge variant="primary">{{ selectedProducts.length }} مورد</b-badge>
       </div>
       
@@ -791,6 +791,7 @@
         :products="products"
         :bill-data="billData"
         :delivery_date="deliveryItems[delivery_date]? deliveryItems[delivery_date].date: null"
+        :day-label="delivery_date === -1 ? '' : getDeliveryItemText(delivery_date)"
         :delivery_time="delivery_time"
         :check_one="check_one"
         :delivery_address="fullDeliveryAddress"

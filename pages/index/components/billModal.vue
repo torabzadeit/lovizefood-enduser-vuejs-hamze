@@ -1,14 +1,17 @@
 <template>
   <b-modal id="modal-bill" centered hide-footer hide-header dialog-class="laviz-bill-modal" body-class="p-0">
-    <div class="laviz-bill-modal__head" v-if="auth.is_login">
-      {{ auth.user.first_name + " " + auth.user.last_name }} عزیز، فاکتور شما
+    <div class="laviz-bill-modal__head">
+      <span class="laviz-bill-modal__title">{{ auth.is_login ? auth.user.first_name + " " + auth.user.last_name + " عزیز، فاکتور شما" : "فاکتور شما" }}</span>
+      <button type="button" class="laviz-bill-modal__close" aria-label="بستن" @click="$bvModal.hide('modal-bill')">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
     </div>
     <div class="laviz-bill-modal__body" v-if="selectedProducts.length > 0">
   <div class="laviz-bill-card">
     
     <!-- هدر -->
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <strong>🛒 محصولات انتخاب شده:</strong>
+      <strong>خرید شما:</strong>
       <b-badge variant="primary">{{ selectedProducts.length }} مورد</b-badge>
     </div>
 
@@ -68,10 +71,10 @@
         <div class="laviz-bill-delivery__label">نوع ارسال</div>
         <div class="laviz-bill-delivery__value">
           <template v-if="delivery_type === 'sendToMe'">
-            {{ jalaliDate(delivery_date, 'jD jMMMM jYYYY') }} برام ارسال کنید.
+            {{ deliveryDayText }} برام ارسال کنید.
           </template>
           <template v-else>
-            {{ jalaliDate(delivery_date, 'jD jMMMM jYYYY') }} حضوری میام.
+            {{ deliveryDayText }} حضوری میام.
           </template>
           <div v-if="delivery_time" class="laviz-bill-delivery__sub">ساعت {{ delivery_time }}</div>
         </div>
@@ -103,6 +106,8 @@ export default {
     discountCode: Object,
     delivery_type: String,
     delivery_date: String,
+    // "امروز", "فردا" or "پس فردا" for the chosen day.
+    dayLabel: { type: String, default: '' },
     delivery_time: String,
     check_one: Boolean,
     delivery_address: String,
@@ -161,6 +166,12 @@ export default {
     }
   },
   computed: {
+    // Today reads as just "امروز"; other days read "فردا ۱۶ آبان ۱۴۰۵".
+    deliveryDayText() {
+      const date = this.jalaliDate(this.delivery_date, 'jD jMMMM jYYYY');
+      if (!this.dayLabel) return date;
+      return this.dayLabel === 'امروز' ? this.dayLabel : `${this.dayLabel} ${date}`;
+    },
   hasValidProducts() {
     if (this.products.length < 2) return false;
     
@@ -192,12 +203,39 @@ export default {
 </script>
 
 <style scoped lang="scss">
+/* Title on the right (start), close button on the left (end). */
 .laviz-bill-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 1.25rem 0;
   font-weight: 800;
-  text-align: center;
-  padding: 1rem 1.25rem 0;
+  text-align: right;
   font-size: 1.05rem;
 }
+
+.laviz-bill-modal__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.laviz-bill-modal__close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-inline-end: -0.5rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--lz-surface-soft);
+  color: var(--lz-ink);
+  cursor: pointer;
+}
+
+.laviz-bill-modal__close:active { transform: scale(0.92); }
 
 .laviz-bill-modal__body {
   padding: 0 1.25rem 0.5rem;
@@ -256,12 +294,9 @@ export default {
   margin-top: 0.75rem;
   padding: 0.85rem 1rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--lz-accent-deep), var(--lz-accent));
+  background: var(--lz-accent);
   color: #fff;
   font-weight: 800;
 }
 
-.laviz-bill-modal__actions {
-  padding: 1rem 1.25rem 1.25rem;
-}
 </style>

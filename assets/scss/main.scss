@@ -2527,3 +2527,32 @@ html[data-theme='dark'] .time-sheet__slot--active {
 .b-toast .toast .toast-body { display: flex; align-items: center; gap: 12px; }
 .b-toast .toast .toast-body::before { display: block; }
 
+/* Bill sheet: "تأیید و پرداخت" is pinned to the bottom of the sheet, flush with
+   the left, right and bottom edges, with no margin around it. */
+.modal .modal-dialog.laviz-bill-modal .modal-content { padding-bottom: 0; border-left: 0; border-right: 0; }
+
+.laviz-bill-modal__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 1rem 0 0;
+  padding: 0;
+  background: var(--lz-accent);
+  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.laviz-bill-modal__actions .laviz-btn-pay {
+  display: block;
+  width: 100%;
+  min-height: 58px;
+  margin: 0;
+  /* The home indicator area stays inside the button, not below it. */
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  border: 0;
+  border-radius: 0;
+  background: var(--lz-accent);
+  box-shadow: none;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
