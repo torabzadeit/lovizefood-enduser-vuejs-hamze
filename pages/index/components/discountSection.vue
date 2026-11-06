@@ -192,7 +192,12 @@ export default {
   gap: var(--lz-space-2);
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: var(--lz-space-1);
+  /* A scroll container clips what spills out of it, card shadows included.
+     The padding gives the shadows room; the negative margins give the space
+     back, so the layout does not change. The row also runs to the screen
+     edges, so cards slide out instead of being cut at the section padding. */
+  padding: 8px var(--lz-space-4) 32px;
+  margin: -8px calc(-1 * var(--lz-space-4)) -24px;
 }
 
 .offers__list::-webkit-scrollbar { display: none; }

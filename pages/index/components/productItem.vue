@@ -39,7 +39,7 @@
                noise; the stepper count already reads as a quantity. The prop
                stays because the cart still labels its lines with it. -->
         </template>
-        <span v-else class="product-card__out-label">اتمام موجودی</span>
+        <span v-else class="product-card__out-label">اتمام موجودی امروز</span>
       </div>
     </div>
 
@@ -348,7 +348,17 @@ export default {
   white-space: nowrap;
 }
 
-.product-card__out-label { color: var(--laviz-danger); background: var(--lz-danger-wash); }
+.product-card__out-label {
+  color: var(--laviz-danger);
+  background: var(--lz-danger-wash);
+  /* "اتمام موجودی امروز" is wider than the picture column: fit it, two lines if needed. */
+  box-sizing: border-box;
+  max-width: 104px;
+  padding: 4px 8px;
+  white-space: normal;
+  text-align: center;
+  line-height: 18px;
+}
 .product-card__locked-label { color: var(--laviz-muted); background: var(--laviz-surface-soft, #eeeef0); }
 
 @media (max-width: 360px) {
