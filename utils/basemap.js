@@ -13,7 +13,7 @@
 export const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
 // How long the style may take before the raster map takes over.
-const STYLE_TIMEOUT_MS = 8000;
+const STYLE_TIMEOUT_MS = 3000;
 
 const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
