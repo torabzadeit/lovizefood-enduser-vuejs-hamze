@@ -39,6 +39,7 @@
   --lz-canvas: #f8f4f1;
   --lz-surface: #ffffff;
   --lz-surface-soft: #f1ebe7;
+  --lz-row-alt: #faf6f3; /* every second menu row */
   --lz-surface-light: #f8f5f3;
 
   /* Page chrome: header wash and the area outside the 720px column on desktop. */
@@ -207,6 +208,7 @@ html[data-theme='dark'] {
   --lz-canvas: #0e0f10;
   --lz-surface: #17181a;
   --lz-surface-soft: #232528;
+  --lz-row-alt: #1d1e20;
   --lz-surface-light: #1d1e21;
 
   --lz-header-start: #1f2022;

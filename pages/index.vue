@@ -1,5 +1,14 @@
 <template>
   <div class="laviz-storefront-shell">
+  <!-- Ambient background: a soft glow, two slow drifting lights and a few
+       rising sparks. Only transform and opacity animate, so it stays on the
+       GPU and costs next to nothing; see .laviz-ambient in main.scss. -->
+  <div class="laviz-ambient" aria-hidden="true">
+    <span class="laviz-ambient__glow"></span>
+    <span class="laviz-ambient__blob laviz-ambient__blob--a"></span>
+    <span class="laviz-ambient__blob laviz-ambient__blob--b"></span>
+    <span v-for="(style, i) in emberStyles" :key="'ember-' + i" class="laviz-ambient__ember" :style="style"></span>
+  </div>
   <b-overlay
     class="laviz-storefront-overlay"
     :show="loading && products.length > 0"
@@ -428,6 +437,7 @@
                     :center-lng="mapCenter.lng"
                     :restaurant-name="mapCenter.name || 'رستوران لاویز'"
                     :restaurant-address="mapCenter.address || in_person_description"
+                    @navigate="openNavigation"
                   />
                 </client-only>
               </div>
@@ -1063,8 +1073,10 @@ export default {
       this.$bvModal.show('modal-login');
     },
     onLoginModalClosed() {
-      // Closing the dialog must not turn a later checkout login into a profile redirect.
+      // Closing the dialog must not turn a later login into a profile redirect
+      // or an unexpected basket.
       this.profileLoginPending = false;
+      this.pendingContinue = false;
     },
     pickSavedAddress(addr) {
       this.selectedAddressId = addr.id;
@@ -1282,6 +1294,9 @@ export default {
     },
     openCart() {
       if (!this.selectedProducts.length) return;
+      // A guest signs in first; the basket opens by itself right after
+      // (advanceToDetails), without the "welcome" dialog in between.
+      if (!this.auth.is_login) { this.startLoginFromCart(); return; }
       this.cartOpen = true;
       this.loadMyDiscountCodes();
       if (process.client) document.body.style.overflow = 'hidden';
@@ -1790,7 +1805,7 @@ export default {
         this.$router.push('/profile');
         return;
       }
-      this.$bvModal.show("success-login");
+      if (!this.pendingContinue) this.$bvModal.show("success-login");
       if (this.pendingContinue) this.advanceToDetails();
 
       this.loginForm = {
@@ -1814,7 +1829,7 @@ export default {
       if (this.auth.discountCodeRequest == true) {
         this.approveDiscountCode();
         this.auth.discountCodeRequest = false;
-      } else {
+      } else if (!this.pendingContinue) {
         this.$bvModal.show("success-login");
       }
       if (this.pendingContinue) this.advanceToDetails();
@@ -1923,6 +1938,17 @@ export default {
     }
   },
   computed: {
+    // Positions, sizes and timings of the sparks. Fixed numbers (no randomness)
+    // so the layout is the same on every load.
+    emberStyles() {
+      return Array.from({ length: 14 }, (_, n) => ({
+        '--ex': ((n * 53 + 11) % 96) + 2 + '%',
+        '--es': 2 + (n % 3) + 'px',
+        '--ed': 18 + ((n * 7) % 14) + 's',
+        '--edl': -(n * 3.1) + 's',
+        '--esw': ((n * 11) % 44) - 22 + 'px',
+      }));
+    },
     // Delivery needs an address; pick-up does not.
     addressMissing() {
       return this.delivery_type === 'sendToMe' && !(this.delivery_address || '').trim();

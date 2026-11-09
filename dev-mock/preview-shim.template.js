@@ -46,7 +46,7 @@
   }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
 
   // ---- map.ir stand-in -----------------------------------------------------
-  // The preview has no network access to map.ir. Tiles become a generic street
+  // The preview has no network access to map.ir, OpenFreeMap or Nominatim. Tiles become a generic street
   // grid, search covers a few Qaen places, reverse geocoding names the nearest
   // one. None of this is real map data; it only lets the map UI be exercised.
   var PLACES = [
@@ -61,9 +61,10 @@
   function jsonResponse(obj) {
     return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
-  function paintTile(url) {
-    var q = new URL(url).searchParams, bbox = (q.get('bbox') || q.get('BBOX') || '0,0,1,1').split(',').map(Number);
-    var minx = bbox[0], miny = bbox[1], span = bbox[2] - bbox[0], N = 256, k = N / span;
+  // One map tile (256px) of the generic street grid; minx/miny in web-mercator
+  // metres, span the tile's width in metres.
+  function drawTile(minx, miny, span) {
+    var N = 256, k = N / span;
     var c = document.createElement('canvas'); c.width = c.height = N;
     var g = c.getContext('2d');
     g.fillStyle = '#eceee6'; g.fillRect(0, 0, N, N);
@@ -82,13 +83,44 @@
     g.fillStyle = '#fbe3a0';
     for (var a = Math.floor(minx / (CELL * 5)); a <= Math.ceil((minx + span) / (CELL * 5)); a++) g.fillRect(px(a * CELL * 5) - Math.max(3, 16 * k) / 2, 0, Math.max(3, 16 * k), N);
     for (var b = Math.floor(miny / (CELL * 5)); b <= Math.ceil((miny + span) / (CELL * 5)); b++) g.fillRect(0, py(b * CELL * 5) - Math.max(3, 16 * k) / 2, N, Math.max(3, 16 * k));
+    return c;
+  }
+  function paintTile(url) {
+    var q = new URL(url).searchParams, bbox = (q.get('bbox') || q.get('BBOX') || '0,0,1,1').split(',').map(Number);
+    var c = drawTile(bbox[0], bbox[1], bbox[2] - bbox[0]);
     return new Promise(function (resolve) {
       c.toBlob(function (blob) { resolve(new Response(blob, { status: 200, headers: { 'Content-Type': 'image/png' } })); }, 'image/png');
     });
   }
+  // The app asks for its base map through this hook when it exists (see
+  // utils/basemap.js): the real one needs servers this page cannot reach.
+  window.__lavizBasemap = function (L, map) {
+    var Grid = L.GridLayer.extend({
+      createTile: function (coords) {
+        var world = 40075016.68, size = world / Math.pow(2, coords.z);
+        var minx = -world / 2 + coords.x * size, maxy = world / 2 - coords.y * size;
+        return drawTile(minx, maxy - size, size);
+      }
+    });
+    return new Grid({ maxZoom: 19, tileSize: 256 }).addTo(map);
+  };
   var realFetch = window.fetch;
   window.fetch = function (input, init) {
     var u = typeof input === 'string' ? input : (input && input.url) || '';
+    if (u.indexOf('https://nominatim.openstreetmap.org/') === 0) {
+      var nu = new URL(u);
+      if (nu.pathname === '/search') {
+        var term = (nu.searchParams.get('q') || '').trim();
+        return Promise.resolve(jsonResponse(PLACES.filter(function (p) { return p.title.indexOf(term) !== -1; }).map(function (p) {
+          return { name: p.title, display_name: p.title + '، قائن', lat: String(p.lat), lon: String(p.lng), address: { road: p.title, city: 'قائن' } };
+        })));
+      }
+      if (nu.pathname === '/reverse') {
+        var rla = +nu.searchParams.get('lat'), rlo = +nu.searchParams.get('lon'), nb = PLACES[0], nd = 1e9;
+        PLACES.forEach(function (p) { var d = Math.hypot(p.lat - rla, p.lng - rlo); if (d < nd) { nd = d; nb = p; } });
+        return Promise.resolve(jsonResponse({ display_name: nb.title + '، قائن', address: { road: nb.title, city: 'قائن' } }));
+      }
+    }
     if (u.indexOf('https://map.ir/') !== 0) return realFetch.apply(this, arguments);
     if (u.indexOf('/shiveh/wms') !== -1) return paintTile(u);
     var url = new URL(u);

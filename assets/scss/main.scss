@@ -1236,7 +1236,6 @@ body {
   display: none;
 }
 
-@import "./pwa-call-out";
 
 
 /* Menu sections (continuous scroll layout) ---------------------------------
@@ -2556,4 +2555,167 @@ html[data-theme='dark'] .time-sheet__slot--active {
   line-height: 1.8;
   color: var(--lz-ink-muted);
 }
+
+/* Menu rows alternate: every second row sits on a faint tinted band, which
+   runs to the edges of the section so it reads as a stripe, not a card. */
+.menu-section .order-item {
+  margin-bottom: 0;
+  margin-inline: calc(-1 * var(--lz-space-4));
+  padding-inline: var(--lz-space-4);
+}
+
+.menu-section .order-item:nth-of-type(even) {
+  background: var(--lz-row-alt);
+}
+
+/* Dragging the page with a mouse: show the grab hand and never select text. */
+html.page-dragging,
+html.page-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* =============================================================================
+   Ambient background
+   A fixed layer behind the menu: a soft glow at the top, two huge radial
+   lights that drift very slowly, and a few small sparks that rise and fade
+   (the glowing gold of the printed menu). No blur filters and nothing that
+   triggers layout: only transform and opacity animate. Dark theme glows
+   saffron; light theme only gets a faint warm tint. Still (no motion) with
+   "reduce motion".
+   ============================================================================= */
+.laviz-storefront-shell { position: relative; isolation: isolate; }
+
+.laviz-ambient {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(100vw, 720px);
+  transform: translateX(-50%);
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.laviz-ambient__glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 75% 34% at 50% 0, rgba(240, 179, 35, 0.13), transparent 70%),
+    radial-gradient(ellipse 80% 26% at 50% 100%, rgba(240, 179, 35, 0.07), transparent 70%);
+}
+
+.laviz-ambient__blob {
+  position: absolute;
+  width: 120vmin;
+  height: 120vmin;
+  max-width: 760px;
+  max-height: 760px;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.laviz-ambient__blob--a {
+  top: -30%;
+  right: -45%;
+  background: radial-gradient(circle, rgba(240, 179, 35, 0.12), transparent 62%);
+  animation: ambient-drift-a 34s ease-in-out infinite alternate;
+}
+
+.laviz-ambient__blob--b {
+  bottom: -35%;
+  left: -50%;
+  background: radial-gradient(circle, rgba(138, 19, 24, 0.07), transparent 62%);
+  animation: ambient-drift-b 42s ease-in-out infinite alternate;
+}
+
+.laviz-ambient__ember {
+  position: absolute;
+  bottom: -10px;
+  left: var(--ex);
+  width: var(--es);
+  height: var(--es);
+  border-radius: 50%;
+  background: #f0b323;
+  box-shadow: 0 0 8px 2px rgba(240, 179, 35, 0.55);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: ambient-rise var(--ed) linear var(--edl) infinite;
+}
+
+@keyframes ambient-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-12%, 14%, 0) scale(1.15); }
+}
+
+@keyframes ambient-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to { transform: translate3d(14%, -12%, 0) scale(0.95); }
+}
+
+@keyframes ambient-rise {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  12% { opacity: 0.85; }
+  70% { opacity: 0.5; }
+  100% { transform: translate3d(var(--esw), -108vh, 0); opacity: 0; }
+}
+
+/* Light theme: a warm tint only, no sparks. */
+html:not([data-theme='dark']) .laviz-ambient__glow {
+  background:
+    radial-gradient(ellipse 75% 30% at 50% 0, rgba(240, 179, 35, 0.10), transparent 70%),
+    radial-gradient(ellipse 80% 24% at 50% 100%, rgba(138, 19, 24, 0.04), transparent 70%);
+}
+
+html:not([data-theme='dark']) .laviz-ambient__ember { display: none; }
+
+/* Dark theme stays neutral: no crimson light, a little more saffron. */
+html[data-theme='dark'] .laviz-ambient__blob--b {
+  background: radial-gradient(circle, rgba(240, 179, 35, 0.05), transparent 62%);
+}
+
+/* The bands let the layer show through; text sits on the same surface colour. */
+.laviz-storefront-shell .menu-section,
+.laviz-storefront-shell .offers { background: transparent; }
+
+.laviz-storefront-shell .menu-section .order-item:nth-of-type(even) {
+  background: color-mix(in srgb, var(--lz-row-alt) 72%, transparent);
+}
+
+/* The printed menu's glowing title, for the dark theme. */
+html[data-theme='dark'] .section-heading {
+  text-shadow: 0 0 16px rgba(240, 179, 35, 0.38);
+}
+
+html[data-theme='dark'] .section-heading::before {
+  background:
+    radial-gradient(circle at 3.5px 50%, var(--lz-saffron) 0 3px, transparent 3.5px),
+    linear-gradient(to left, transparent, var(--lz-saffron)) 0 50% / 100% 1px no-repeat;
+  filter: drop-shadow(0 0 3px rgba(240, 179, 35, 0.55));
+}
+
+html[data-theme='dark'] .section-heading::after {
+  background:
+    radial-gradient(circle at calc(100% - 3.5px) 50%, var(--lz-saffron) 0 3px, transparent 3.5px),
+    linear-gradient(to right, transparent, var(--lz-saffron)) 0 50% / 100% 1px no-repeat;
+  filter: drop-shadow(0 0 3px rgba(240, 179, 35, 0.55));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .laviz-ambient__blob,
+  .laviz-ambient__ember { animation: none; }
+  .laviz-ambient__ember { display: none; }
+}
+
+/* Dark theme: the base map has no dark style, so its picture is inverted and
+   toned down (markers, buttons and popups are separate layers, unaffected). */
+html[data-theme='dark'] .leaflet-container .maplibregl-canvas,
+html[data-theme='dark'] .leaflet-container .leaflet-tile-pane img.leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.92) saturate(0.85);
+}
+
+/* The base map's credit stays small. */
+.leaflet-control-attribution { font-size: 10px; }
 

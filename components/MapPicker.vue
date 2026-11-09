@@ -44,7 +44,20 @@
       <button v-if="!readonly" type="button" class="btn btn-outline-primary btn-sm" @click="useMyLocation">
         موقعیت من
       </button>
-      <button type="button" class="btn btn-outline-secondary btn-sm" @click="focusRestaurant">
+      <!-- Pick-up map: the button centres the map on the restaurant (what it
+           always did) and also hands the trip to the phone's navigation apps. -->
+      <button
+        v-if="readonly"
+        type="button"
+        class="map-picker__navigate"
+        @click="navigateToRestaurant"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+          <path d="M20 4L4 11l7 2 2 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+        مسیریابی به رستوران
+      </button>
+      <button v-else type="button" class="btn btn-outline-secondary btn-sm" @click="focusRestaurant">
         نمایش رستوران
       </button>
       <small v-if="resolvedAddress" class="map-picker__address text-muted mr-2">
@@ -59,12 +72,11 @@
 
 <script>
 import L from 'leaflet';
+import { addBasemap } from '~/utils/basemap';
 import 'leaflet/dist/leaflet.css';
 import {
-  createMapirTileLayer,
   DEFAULT_MAP_CENTER,
   formatSearchLabel,
-  getMapirApiKey,
   mapirReverse,
   mapirSearch,
 } from '~/utils/mapir';
@@ -127,7 +139,7 @@ export default {
   },
   mounted() {
     if (process.server) return;
-    this.mapirEnabled = !!getMapirApiKey();
+    this.mapirEnabled = true; // map.ir with a key, otherwise Nominatim
     this.localLat = this.lat;
     this.localLng = this.lng;
     this.$nextTick(() => this.ensureMap());
@@ -183,6 +195,10 @@ export default {
         this.restaurantMarker.setLatLng([lat, lng]);
         this.bindRestaurantPopup();
       }
+    },
+    navigateToRestaurant() {
+      this.focusRestaurant();
+      this.$emit('navigate');
     },
     focusRestaurant() {
       if (!this.map) {
@@ -247,7 +263,7 @@ export default {
         zoomControl: true,
       }).setView([viewLat, viewLng], this.zoom);
 
-      createMapirTileLayer(L, getMapirApiKey()).addTo(this.map);
+      addBasemap(L, this.map);
 
       this.syncRestaurantMarker();
 
@@ -482,4 +498,23 @@ export default {
   filter: drop-shadow(0 2px 4px rgba(42, 35, 24, 0.35));
   pointer-events: none;
 }
+
+.map-picker__navigate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--lz-accent);
+  color: var(--lz-on-accent, #fff);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.map-picker__navigate:active { transform: scale(0.98); }
+.map-picker__navigate:focus-visible { outline: 2px solid var(--lz-saffron); outline-offset: 2px; }
 </style>

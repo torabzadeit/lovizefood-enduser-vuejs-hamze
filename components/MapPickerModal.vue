@@ -80,12 +80,11 @@
 
 <script>
 import L from 'leaflet';
+import { addBasemap } from '~/utils/basemap';
 import 'leaflet/dist/leaflet.css';
 import {
-  createMapirTileLayer,
   DEFAULT_MAP_CENTER,
   formatSearchLabel,
-  getMapirApiKey,
   mapirReverse,
   mapirSearch,
 } from '~/utils/mapir';
@@ -135,7 +134,7 @@ export default {
   },
   computed: {
     searchEnabled() {
-      return !!getMapirApiKey();
+      return true; // map.ir with a key, otherwise Nominatim
     },
     searchPlaceholder() {
       return this.searchEnabled ? 'جستجوی آدرس، خیابان یا مکان' : 'جستجو در این نسخه فعال نیست';
@@ -203,7 +202,7 @@ export default {
         // First visit: slide the map so the restaurant sits above the pin
         // instead of underneath it, and both can be seen.
         if (!hasSelection) this.map.panBy([0, 120], { animate: false });
-        createMapirTileLayer(L, getMapirApiKey()).addTo(this.map);
+        addBasemap(L, this.map);
 
         const icon = L.divIcon({
           className: 'mpm__restaurant-icon',

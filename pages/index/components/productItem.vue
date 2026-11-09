@@ -131,7 +131,8 @@ export default {
   align-items: flex-start;
   gap: 12px;
   padding: 16px 0;
-  background: var(--laviz-surface);
+  /* Transparent: the row behind it (plain or tinted) shows through. */
+  background: transparent;
   border-bottom: 1px solid var(--laviz-border-light, #f6f6f6);
 }
 

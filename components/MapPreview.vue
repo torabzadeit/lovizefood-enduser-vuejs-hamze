@@ -19,7 +19,7 @@
 <script>
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { createMapirTileLayer, getMapirApiKey } from '~/utils/mapir';
+import { addBasemap } from '~/utils/basemap';
 
 const PIN = `<svg viewBox="0 0 32 42" width="32" height="42" aria-hidden="true"><path d="M16 41S3 27.5 3 15.5a13 13 0 0 1 26 0C29 27.5 16 41 16 41z" fill="#8a1318" stroke="#fff" stroke-width="2"/><circle cx="16" cy="15.5" r="5" fill="#fff"/></svg>`;
 
@@ -49,7 +49,7 @@ export default {
         keyboard: false,
         tap: false,
       }).setView([this.lat, this.lng], 16);
-      createMapirTileLayer(L, getMapirApiKey()).addTo(this.map);
+      addBasemap(L, this.map);
       this.marker = L.marker([this.lat, this.lng], {
         interactive: false,
         keyboard: false,
