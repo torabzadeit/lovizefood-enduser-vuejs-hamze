@@ -22,6 +22,14 @@
         const t = new Date(tehranToday() + i * 864e5);
         d.date = `${t.getUTCFullYear()}/${t.getUTCMonth() + 1}/${t.getUTCDate()}`;
       });
+      // Not in the real API yet: the backend has to define this delivery type
+      // ("snapp", the customer books their own Snapp) before it can show up there.
+      if (Array.isArray(body.deliveryTypeOptions) && !body.deliveryTypeOptions.some((o) => o.value === 'snapp')) {
+        body.deliveryTypeOptions.push({ text: 'خودم اسنپ می‌گیرم', value: 'snapp' });
+      }
+      // The real API returns the signed-in customer's saved addresses here; the
+      // snapshot was taken signed out, so it has none.
+      if (!body.savedAddresses) body.savedAddresses = sampleAddresses();
       return body;
     }
 
@@ -48,6 +56,54 @@
     const usedCodes = [{ id: 'dc-0', code: 'WELCOME', title: 'اولین سفارش', amount: 30000, expTime: null }];
     const findCode = (code) => sampleCodes.find((c) => c.code.toLowerCase() === String(code || '').trim().toLowerCase());
 
+    // Made-up order history for the profile page. Dates are counted back from
+    // today so the list always looks recent. Statuses: 12 being prepared,
+    // 20 delivered (see statusLabel in orderHistory.vue).
+    function sampleOrders() {
+      const day = 864e5;
+      const at = (daysAgo, hour, minute) => {
+        const d = new Date(Date.now() - daysAgo * day);
+        d.setHours(hour, minute, 0, 0);
+        return d.toISOString();
+      };
+      // Lines use the same fields as the current-order endpoint: productTitle,
+      // count, amount (unit price). Names and prices come from the menu snapshot.
+      return [
+        {
+          id: 'a1f3c9d2-7b41-4e0a-9c55-1d2e3f4a5b61', orderNumber: '10482', status: 12, createDate: at(0, 12, 41), deliveryDate: at(0, 13, 30), deliveryTime: '13:30', totalAmount: 1240000,
+          items: [
+            { id: 'i-1', productTitle: 'چلو کباب ویژه لاویز', count: 1, amount: 600000 },
+            { id: 'i-2', productTitle: 'چلو جوجه کباب', count: 1, amount: 460000 },
+            { id: 'i-3', productTitle: 'نوشابه قوطی کوکاکولا', count: 2, amount: 90000 },
+          ],
+        },
+        {
+          id: 'b7d20e84-3c96-4a1f-8e07-6a5b4c3d2e10', orderNumber: '10431', status: 20, createDate: at(3, 19, 5), deliveryDate: at(3, 20, 0), deliveryTime: '20:00', totalAmount: 1150000,
+          items: [
+            { id: 'i-4', productTitle: 'چلو وزیری', count: 1, amount: 700000 },
+            { id: 'i-5', productTitle: 'چلو مرغ سرخ شده', count: 1, amount: 450000 },
+          ],
+        },
+        {
+          id: 'c5e81a37-9d02-4b6c-a3f4-0e1d2c3b4a59', orderNumber: '10377', status: 20, createDate: at(9, 13, 18), deliveryDate: at(9, 14, 15), deliveryTime: '14:15', totalAmount: 475000,
+          items: [
+            { id: 'i-6', productTitle: 'چلو جوجه کباب', count: 1, amount: 460000 },
+            { id: 'i-7', productTitle: 'سس مایونز رعنا', count: 1, amount: 15000 },
+          ],
+        },
+      ];
+    }
+
+    // Made-up saved addresses, a few streets from the restaurant (mapCenter in
+    // the snapshot). Same fields the profile page and the basket read.
+    function sampleAddresses() {
+      return [
+        { id: 'ad-1', title: 'خانه', address: 'قائن، بلوار بسیج، کوچه ۱۲، منزل آقای نمونه', isDefault: true, plateNumber: '۲۴', unitNumber: '', lat: 33.7289, lng: 59.1856 },
+        { id: 'ad-2', title: 'محل کار', address: 'قائن، خیابان امام خمینی، نبش کوچه ۸، طبقه دوم', isDefault: false, plateNumber: '۱۱۰', unitNumber: '۳', lat: 33.7351, lng: 59.1801 },
+        { id: 'ad-3', title: 'منزل پدری', address: 'قائن، خیابان بصیرت، کوچه ۴، بن‌بست گل‌ها', isDefault: false, plateNumber: '۷', unitNumber: '', lat: 33.7312, lng: 59.1894 },
+      ];
+    }
+
     const user = { id: 'mock-user', first_name: 'کاربر', last_name: 'نمونه', mobile: '09120000000' };
     const json = (body, status = 200) => ({ status, body });
     const routes = {
@@ -56,10 +112,10 @@
       'POST /api/auth/check-mobile': () => json({ is_new_user: false, verify_code: '12345' }),
       'POST /api/auth/login': () => json({ token: 'mock-token', user }),
       'POST /api/auth/register': () => json({ token: 'mock-token', user }),
-      'GET /api/enduser/profile': () => json(user),
+      'GET /api/enduser/profile': () => json(Object.assign({}, user, { addresses: sampleAddresses() })),
       'PUT /api/enduser/profile': () => json(user),
-      'GET /api/enduser/profile/addresses': () => json([]),
-      'GET /api/enduser/profile/orders': () => json([]),
+      'GET /api/enduser/profile/addresses': () => json(sampleAddresses()),
+      'GET /api/enduser/profile/orders': () => json(sampleOrders()),
       'GET /api/enduser/profile/orders/current': () => json({ order: null, items: [] }),
       'GET /api/enduser/profile/password-status': () => json({ hasPassword: false }),
       'GET /api/enduser/profile/discount-codes': () => json({ available: sampleCodes, used: usedCodes }),

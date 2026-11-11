@@ -19,7 +19,7 @@ const env = Object.assign({}, process.env, {
   MAP_IR_API_KEY: '', // no map.ir key: tiles come from OpenFreeMap, search from Nominatim
   NODE_OPTIONS: [process.env.NODE_OPTIONS, '--openssl-legacy-provider'].filter(Boolean).join(' '),
 });
-const r = spawnSync('npx', ['nuxt', 'generate', '--config-file', 'dev-mock/nuxt.preview.config.js'], { cwd: root, env, stdio: 'inherit' });
+const r = spawnSync('npx', ['nuxt', 'generate', '--config-file', 'dev-mock/nuxt.preview.config.js'], { cwd: root, env, stdio: 'inherit', shell: process.platform === 'win32' });
 if (r.status !== 0) process.exit(r.status || 1);
 
 // Post-process the output so it works from any folder (the hosting path is not
