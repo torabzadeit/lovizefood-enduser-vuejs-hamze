@@ -296,7 +296,11 @@
 
         <div class="laviz-cart-modal__scroll">
         <section class="laviz-section laviz-cart-items">
-          <h3 class="laviz-section__title">خرید شما</h3>
+          <div class="laviz-cart-items__head">
+            <h3 class="laviz-section__title">خرید شما</h3>
+            <!-- Back to the menu to pick more; the basket keeps its items. -->
+            <button type="button" class="laviz-cart-items__add" @click="closeCart">اضافه کردن</button>
+          </div>
           <!-- Rows slide into and out of place instead of jumping, and every
                column has a fixed width so a changing number never moves its
                neighbours. -->
@@ -376,7 +380,7 @@
                     @click="chooseAsapTime"
                   >
                     <span class="laviz-day__label">تحویل فوری</span>
-                    <small class="laviz-day__note">نزدیک‌ترین زمان: {{ faTime(deliveryTimes[0].value) }}</small>
+                    <small class="laviz-day__note">۳۰ تا ۴۵ دقیقه از زمان ثبت سفارش</small>
                   </button>
                   <button
                     type="button"
@@ -426,8 +430,11 @@
               </div>
 
 
-              <div class="mt-3" v-if="delivery_type == 'iWillCome'">
-                <label class="form-label font-weight-bold">موقعیت رستوران (تحویل حضوری)</label>
+              <div class="mt-3" v-if="isPickupLike">
+                <label class="form-label font-weight-bold">{{ delivery_type === 'snapp' ? 'موقعیت رستوران (برای سفارش اسنپ)' : 'موقعیت رستوران (تحویل حضوری)' }}</label>
+                <p v-if="delivery_type === 'snapp'" class="laviz-choice-note">
+                  اسنپ را خودتان سفارش می‌دهید. هزینه‌ی ارسال به فاکتور اضافه نمی‌شود.
+                </p>
                 <p class="text-muted small mb-2">{{ in_person_description || mapCenter.address }}</p>
                 <client-only>
                   <map-picker
@@ -1689,7 +1696,7 @@ export default {
       }
 
 
-      if (this.delivery_type == "iWillCome" && !this.delivery_time) {
+      if (this.isPickupLike && !this.delivery_time) {
         if (this.deliveryTimes.length > 1) {
           this.$bvToast.toast("لطفاً ساعت تحویل را انتخاب کنید", { variant: "danger" });
           return false;
@@ -1926,7 +1933,7 @@ export default {
       this.calcBill();
       if (value === 'sendToMe') {
         this.$nextTick(() => this.$refs.deliveryMap?.refreshMap());
-      } else if (value === 'iWillCome') {
+      } else if (value === 'iWillCome' || value === 'snapp') {
         this.$nextTick(() => this.$refs.restaurantMap?.refreshMap());
       }
     },
@@ -1948,6 +1955,11 @@ export default {
         '--edl': -(n * 3.1) + 's',
         '--esw': ((n * 11) % 44) - 22 + 'px',
       }));
+    },
+    // The customer collects (or sends their own Snapp for) the order: no
+    // address, no shipping cost, and the restaurant's location is what matters.
+    isPickupLike() {
+      return this.delivery_type === 'iWillCome' || this.delivery_type === 'snapp';
     },
     // Delivery needs an address; pick-up does not.
     addressMissing() {

@@ -73,6 +73,9 @@
           <template v-if="delivery_type === 'sendToMe'">
             {{ deliveryDayText }} برام ارسال کنید.
           </template>
+          <template v-else-if="delivery_type === 'snapp'">
+            {{ deliveryDayText }} خودم اسنپ می‌گیرم.
+          </template>
           <template v-else>
             {{ deliveryDayText }} حضوری میام.
           </template>
@@ -294,9 +297,14 @@ export default {
   margin-top: 0.75rem;
   padding: 0.85rem 1rem;
   border-radius: 10px;
-  background: var(--lz-accent);
+  background: var(--lz-success);
   color: #fff;
   font-weight: 800;
+}
+
+/* The dark theme's green is light, so the text on it goes dark. */
+html[data-theme='dark'] .laviz-bill-card__total {
+  color: #0e0f10;
 }
 
 </style>

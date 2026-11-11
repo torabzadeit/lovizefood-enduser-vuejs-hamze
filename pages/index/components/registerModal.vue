@@ -32,7 +32,7 @@
             <path d="M10.5 18.5h3" />
           </svg>
         </div>
-        <h2 class="auth-head__title">ورود به لاویز</h2>
+        <h2 class="auth-head__title">برای ثبت سفارش</h2>
         <p class="auth-head__sub">شماره موبایل خود را وارد کنید تا کد تایید برایتان ارسال شود.</p>
       </div>
 

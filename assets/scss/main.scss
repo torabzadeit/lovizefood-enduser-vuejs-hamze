@@ -1347,6 +1347,46 @@ body {
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
 }
 
+/* "خرید شما" row: the title on one side, an "add more" action on the other.
+   The dashed rule moves from the title to the row so it runs under both. */
+.laviz-cart-items__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px dashed var(--laviz-border);
+}
+
+.laviz-cart-items__head .laviz-section__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.laviz-cart-items__add {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--laviz-primary);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--laviz-primary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.2s ease;
+}
+
+.laviz-cart-items__add:active {
+  transform: scale(0.95);
+  background: var(--laviz-primary-light);
+}
+
 .laviz-cart-items__empty {
   color: var(--laviz-muted);
   font-size: 14px;
