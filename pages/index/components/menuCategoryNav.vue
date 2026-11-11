@@ -128,7 +128,8 @@ export default {
   font-size: 14px;
   font-weight: 600;
   line-height: 24px;
-  padding: 8px 12px;
+  /* 48px tall: the comfortable minimum for a thumb (it was 40px). */
+  padding: 12px 12px;
   white-space: nowrap;
   cursor: pointer;
   transition: color 0.2s ease;
