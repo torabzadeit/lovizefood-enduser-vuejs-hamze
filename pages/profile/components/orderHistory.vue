@@ -108,10 +108,16 @@ export default {
       if (Number(status) === 12) return 'preparing';
       return 'pending';
     },
+    // Lines of one order, read from `items` on the order (same fields as the
+    // current-order endpoint: productTitle, count, amount = unit price).
     parseOrderItems(order) {
-      // Placeholder for parsing order items from the order response.
-      // This assumes orderitems are passed separately or embedded.
-      return [];
+      const lines = order.items || order.orderItems || [];
+      return lines.map((line, index) => ({
+        id: line.id || `${order.id}-${index}`,
+        title: line.productTitle || line.title || line.name || 'محصول',
+        count: line.count,
+        total: line.total != null ? line.total : Number(line.amount) * Number(line.count),
+      }));
     },
     formatNum(val) {
       return Number(val || 0).toLocaleString();

@@ -1,4 +1,5 @@
 <template>
+  <div>
   <b-modal
     id="address-form-modal"
     centered
@@ -65,19 +66,25 @@
         </div>
       </div>
 
+      <!-- Same flow as the basket: a button opens the full-screen map, and the
+           chosen spot is shown as a small preview with an "edit position" button.
+           The map never changes the address typed above. -->
       <div class="form-group">
         <label class="form-label">موقعیت روی نقشه *</label>
-        <p class="form-hint">
-          روی نقشه کلیک کنید تا موقعیت ارسال را انتخاب کنید.
-        </p>
         <client-only>
-          <map-picker
-            ref="mapPicker"
-            :lat.sync="form.lat"
-            :lng.sync="form.lng"
-            :center-lat="mapCenter.lat"
-            :center-lng="mapCenter.lng"
+          <map-preview
+            v-if="hasPosition"
+            :lat="form.lat"
+            :lng="form.lng"
+            @edit="mapModalOpen = true"
           />
+          <button v-else type="button" class="laviz-map-trigger" @click="mapModalOpen = true">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+              <path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <circle cx="12" cy="10" r="2.3" fill="currentColor"/>
+            </svg>
+            <span>تعیین آدرس روی نقشه</span>
+          </button>
         </client-only>
       </div>
 
@@ -110,15 +117,31 @@
       </button>
     </template>
   </b-modal>
+
+  <!-- Outside the b-modal on purpose: the sheet is moved with a transform, and a
+       position:fixed map inside it would fill the sheet instead of the screen. -->
+  <client-only>
+    <map-picker-modal
+      :open="mapModalOpen"
+      :lat="hasPosition ? form.lat : null"
+      :lng="hasPosition ? form.lng : null"
+      :center-lat="mapCenter.lat"
+      :center-lng="mapCenter.lng"
+      @confirm="onMapConfirm"
+      @close="mapModalOpen = false"
+    />
+  </client-only>
+  </div>
 </template>
 
 <script>
-import MapPicker from '~/components/MapPicker.vue';
+import MapPickerModal from '~/components/MapPickerModal.vue';
+import MapPreview from '~/components/MapPreview.vue';
 import { DEFAULT_MAP_CENTER } from '~/utils/mapir';
 
 export default {
   name: 'AddressForm',
-  components: { MapPicker },
+  components: { MapPickerModal, MapPreview },
   props: {
     address: { type: Object, default: null },
     loading: { type: Boolean, default: false },
@@ -140,6 +163,7 @@ export default {
 
     return {
       mapCenter: DEFAULT_MAP_CENTER,
+      mapModalOpen: false,
       form: {
         ...emptyForm,
         ...address,
@@ -149,10 +173,21 @@ export default {
       },
     };
   },
+  computed: {
+    hasPosition() {
+      return this.form.lat !== null && this.form.lng !== null;
+    },
+  },
   mounted() {
     this.$bvModal.show('address-form-modal');
   },
   methods: {
+    /** A spot was confirmed on the full-screen map; the typed address stays as is. */
+    onMapConfirm({ lat, lng }) {
+      this.form.lat = lat;
+      this.form.lng = lng;
+      this.mapModalOpen = false;
+    },
     submit() {
       if (!this.form.title?.trim()) {
         this.$bvToast.toast('عنوان الزامی است', { variant: 'danger' });

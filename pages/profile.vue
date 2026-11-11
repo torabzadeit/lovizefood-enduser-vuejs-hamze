@@ -3,16 +3,39 @@
     <!-- Header: back button + title -->
     <header class="profile-header">
       <button type="button" class="profile-header__back" @click="$router.back()" aria-label="بازگشت">
-        ←
+        <!-- Points right, the way "back" reads in a right-to-left page. -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 12h16M14 6l6 6-6 6" />
+        </svg>
       </button>
       <h1 class="profile-header__title">پروفایل</h1>
       <div class="profile-header__spacer"></div>
     </header>
 
+    <!-- One tab per section, in the same plain-text style as the menu's category
+         strip. The strip scrolls sideways when it does not fit and stays at the
+         top while the page scrolls. -->
+    <nav ref="tabs" v-drag-scroll class="profile-tabs" role="tablist" aria-label="بخش‌های پروفایل">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        :ref="'tab-' + tab.id"
+        type="button"
+        role="tab"
+        class="profile-tabs__tab"
+        :class="{ 'profile-tabs__tab--active': activeTab === tab.id }"
+        :aria-selected="activeTab === tab.id ? 'true' : 'false'"
+        @click="selectTab(tab.id)"
+      >
+        {{ tab.label }}
+        <span v-if="tab.id === 'messages' && unseenCount" class="profile-tabs__badge">{{ unseenCount }}</span>
+      </button>
+    </nav>
+
     <b-overlay :show="loading" :z-index="999">
       <div class="profile-body">
         <!-- Profile info card -->
-        <section v-if="profileData" class="profile-section">
+        <section v-if="profileData" v-show="activeTab === 'info'" class="profile-section">
           <header class="profile-section__header">
             <h2 class="profile-section__title">اطلاعات شخصی</h2>
             <button
@@ -82,7 +105,7 @@
         </section>
 
         <!-- Password section -->
-        <section class="profile-section">
+        <section v-show="activeTab === 'password'" class="profile-section">
           <header class="profile-section__header">
             <h2 class="profile-section__title">رمز عبور</h2>
           </header>
@@ -142,8 +165,8 @@
           </div>
         </section>
 
-        <!-- Order history section -->
-        <section class="profile-section">
+        <!-- Messages section -->
+        <section v-show="activeTab === 'messages'" class="profile-section">
           <header class="profile-section__header">
             <h2 class="profile-section__title">پیام‌ها</h2>
             <span v-if="unseenCount" class="profile-section__badge">{{ unseenCount }} جدید</span>
@@ -151,12 +174,7 @@
           <notification-list @unseen="unseenCount = $event" />
         </section>
 
-        <section class="profile-section">
-          <h2 class="profile-section__title">کدهای تخفیف من</h2>
-          <my-discount-codes />
-        </section>
-
-        <section class="profile-section">
+        <section v-show="activeTab === 'orders'" class="profile-section">
           <h2 class="profile-section__title">تاریخچه سفارشات</h2>
           <order-history
             :orders="orders"
@@ -167,13 +185,13 @@
         </section>
 
         <!-- Addresses section -->
-        <section class="profile-section">
+        <section v-show="activeTab === 'addresses'" class="profile-section">
           <header class="profile-section__header">
             <h2 class="profile-section__title">آدرس‌های من</h2>
             <button
               type="button"
               class="profile-section__edit-btn"
-              @click="showAddressForm = true"
+              @click="addAddress"
             >
               + افزودن
             </button>
@@ -199,7 +217,7 @@
           :address="addressFormData"
           :loading="savingAddress"
           @save="saveAddress"
-          @close="showAddressForm = false"
+          @close="closeAddressForm"
         />
       </div>
     </b-overlay>
@@ -211,17 +229,26 @@
 <script>
 import OrderHistory from './profile/components/orderHistory.vue';
 import ReviewModal from './profile/components/reviewModal.vue';
-import MyDiscountCodes from './profile/components/myDiscountCodes.vue';
 import NotificationList from './profile/components/notificationList.vue';
 import AddressList from './profile/components/addressList.vue';
 import AddressForm from './profile/components/addressForm.vue';
 import { openOrderReceiptForPrint } from '~/utils/orderReceipt';
+import dragScroll from '~/utils/dragScroll';
 
 export default {
   name: 'ProfilePage',
-  components: { OrderHistory, AddressList, AddressForm, ReviewModal, MyDiscountCodes, NotificationList },
+  components: { OrderHistory, AddressList, AddressForm, ReviewModal, NotificationList },
+  directives: { dragScroll },
   data() {
     return {
+      activeTab: 'info',
+      tabs: [
+        { id: 'info', label: 'اطلاعات' },
+        { id: 'password', label: 'رمز عبور' },
+        { id: 'messages', label: 'پیام‌ها' },
+        { id: 'orders', label: 'سفارش‌ها' },
+        { id: 'addresses', label: 'آدرس‌ها' },
+      ],
       loading: false,
       unseenCount: 0,
       profileData: null,
@@ -251,6 +278,24 @@ export default {
     await this.loadOrders();
   },
   methods: {
+    selectTab(id) {
+      this.activeTab = id;
+      this.$nextTick(this.revealActiveTab);
+    },
+    /**
+     * Slides the strip so the chosen tab is centred. Measured as a delta between
+     * two rects and applied with scrollBy, which works the same in LTR and RTL.
+     */
+    revealActiveTab() {
+      const holder = this.$refs['tab-' + this.activeTab];
+      const tab = Array.isArray(holder) ? holder[0] : holder;
+      const strip = this.$refs.tabs;
+      if (!tab || !strip || strip.scrollWidth <= strip.clientWidth) return;
+      const stripRect = strip.getBoundingClientRect();
+      const tabRect = tab.getBoundingClientRect();
+      const delta = (tabRect.left + tabRect.width / 2) - (stripRect.left + stripRect.width / 2);
+      if (Math.abs(delta) >= 1) strip.scrollBy({ left: delta, behavior: 'smooth' });
+    },
     /** Signs out after a confirmation, then returns to the menu. */
     async logout() {
       let confirmed = false;
@@ -352,6 +397,15 @@ export default {
       this.addressFormData = { ...addr };
       this.showAddressForm = true;
     },
+    // A new address starts from an empty form, not from the one edited last.
+    addAddress() {
+      this.addressFormData = null;
+      this.showAddressForm = true;
+    },
+    closeAddressForm() {
+      this.showAddressForm = false;
+      this.addressFormData = null;
+    },
     async saveAddress(data) {
       try {
         this.savingAddress = true;
@@ -397,18 +451,100 @@ export default {
   align-items: center;
   gap: 0.8rem;
   padding: 1rem 0.9rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
+  background: var(--lz-surface);
+}
+
+/* Section tabs: plain text, 48px tall, a 3px underline under the active one,
+   like the menu's category strip. Sticks to the top while the page scrolls. */
+.profile-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  flex-wrap: nowrap;
   background: var(--lz-surface);
   border-bottom: 1px solid rgba(42, 35, 24, 0.08);
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.profile-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.profile-tabs__tab {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--lz-ink-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 24px;
+  padding: 12px 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.profile-tabs__tab::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  left: 14px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--lz-accent);
+  transform: scaleX(0);
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.profile-tabs__tab--active {
+  color: var(--lz-ink);
+  font-weight: 700;
+}
+
+.profile-tabs__tab--active::after {
+  transform: scaleX(1);
+}
+
+.profile-tabs__tab:active {
+  opacity: 0.7;
+}
+
+.profile-tabs__badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--lz-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
 }
 
 .profile-header__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   border: none;
   background: none;
-  font-size: 1.2rem;
   cursor: pointer;
   color: var(--lz-ink);
-  padding: 0.3rem;
+  padding: 0;
 }
 
 .profile-header__title {
@@ -420,11 +556,11 @@ export default {
 }
 
 .profile-header__spacer {
-  width: 1.8rem;
+  width: 44px;
 }
 
 .profile-body {
-  padding: 0 0.9rem;
+  padding: 1rem 0.9rem 0;
   max-width: 720px;
   margin: 0 auto;
 }
@@ -449,6 +585,13 @@ export default {
   font-weight: 800;
   margin: 0;
   color: var(--lz-ink);
+}
+
+/* A title that sits straight in the section (no header row around it) gets the
+   same gap the header row gives the other sections, so it no longer touches the
+   cards or tabs right below it. */
+.profile-section > .profile-section__title {
+  margin-bottom: 1rem;
 }
 
 .profile-section__edit-btn {
