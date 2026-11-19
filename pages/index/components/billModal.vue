@@ -24,11 +24,11 @@
       <div class="text-right">
         <div class="font-weight-bold">{{ item.name }}</div>
         <small class="text-muted">
-          {{ item.count }} {{ item.unit_name }} × {{ formatNum(item.price) }} تومان
+          {{ item.count }} {{ item.unit_name }} × {{ formatNum(item.price) }}
         </small>
       </div>
-      <div class="text-left font-weight-bold text-success">
-        {{ formatNum(item.total) }} تومان
+      <div class="laviz-bill-card__item-total text-left font-weight-bold">
+        {{ formatNum(item.total) }}
       </div>
     </div>
 
@@ -40,28 +40,28 @@
 
     <!-- تخفیف -->
     <div
-      class="d-flex justify-content-between align-items-center py-2 border-top"
+      class="laviz-bill-card__discount d-flex justify-content-between align-items-center"
       v-if="billData.discount_amount > 0"
     >
-      <span class="text-muted">مبلغ تخفیف :</span>
-      <span class="font-weight-bold text-danger">- {{ formatNum(billData.discount_amount) }} تومان</span>
+      <span>مبلغ تخفیف :</span>
+      <span class="laviz-bill-card__amount font-weight-bold"><span class="laviz-bill-card__sign laviz-bill-card__sign--minus">−</span><span>{{ formatNum(billData.discount_amount) }}</span></span>
     </div>
 
     <div class="d-flex justify-content-between align-items-center py-2 border-top" v-if="delivery_type == 'sendToMe'">
       <span class="text-muted">هزینه ارسال :</span>
-      <span class="font-weight-bold">+ {{ formatNum(billData.shipping_cost || shippingCost) }} تومان</span>
+      <span class="laviz-bill-card__amount font-weight-bold"><span class="laviz-bill-card__sign laviz-bill-card__sign--plus">+</span><span>{{ formatNum(billData.shipping_cost || shippingCost) }}</span></span>
     </div>
     <div class="d-flex justify-content-between align-items-center py-2 border-top" v-if="billData.tax_amount > 0">
       <span class="text-muted">مالیات :</span>
-      <span class="font-weight-bold">+ {{ formatNum(billData.tax_amount) }} تومان</span>
-    </div>
-    <div class="form-group mt-2">
-      <label>توضیحات سفارش (اختیاری)</label>
-      <textarea v-model="orderCommentLocal" class="form-control" rows="2" placeholder="مثلاً بدون نان..." />
+      <span class="laviz-bill-card__amount font-weight-bold"><span class="laviz-bill-card__sign laviz-bill-card__sign--plus">+</span><span>{{ formatNum(billData.tax_amount) }}</span></span>
     </div>
     <div class="laviz-bill-card__total">
       <span>مبلغ قابل پرداخت</span>
       <span>{{ formatNum(billData.payment_amount) }} تومان</span>
+    </div>
+    <div class="form-group mt-2">
+      <label>توضیحات سفارش (اختیاری)</label>
+      <textarea v-model="orderCommentLocal" class="form-control" rows="2" placeholder="مثلاً بدون نان..." />
     </div>
 
   </div>
@@ -84,7 +84,7 @@
       </div>
 
       <div v-if="delivery_type === 'sendToMe'" class="laviz-bill-delivery__row">
-        <div class="laviz-bill-delivery__label">به آدرس</div>
+        <div class="laviz-bill-delivery__label">به آدرس<span v-if="deliveryAddressTitle"> {{ deliveryAddressTitle }}</span></div>
         <div class="laviz-bill-delivery__value">{{ delivery_address }}</div>
       </div>
     </div>
@@ -114,6 +114,7 @@ export default {
     delivery_time: String,
     check_one: Boolean,
     delivery_address: String,
+    deliveryAddressTitle: { type: String, default: '' },
     shippingCost: Number,
     orderComment: String,
     deliveryLat: Number,
@@ -290,6 +291,50 @@ export default {
   margin-top: 0.75rem;
 }
 
+.laviz-bill-card__item-total {
+  color: var(--lz-ink);
+}
+
+.laviz-bill-card__discount {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  background: #198754;
+  color: #fff;
+}
+
+.laviz-bill-card__discount > span {
+  color: #fff;
+}
+
+.laviz-bill-card__amount {
+  display: inline-flex;
+  align-items: center;
+  direction: ltr;
+  unicode-bidi: isolate;
+  gap: 6px;
+}
+
+.laviz-bill-card__sign {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  line-height: 1;
+}
+
+.laviz-bill-card__sign--minus {
+  background: #fff;
+  color: #198754;
+}
+
+.laviz-bill-card__sign--plus {
+  background: #242424;
+  color: #fff;
+}
+
 .laviz-bill-card__total {
   display: flex;
   justify-content: space-between;
@@ -297,14 +342,9 @@ export default {
   margin-top: 0.75rem;
   padding: 0.85rem 1rem;
   border-radius: 10px;
-  background: var(--lz-success);
+  background: #242424;
   color: #fff;
   font-weight: 800;
-}
-
-/* The dark theme's green is light, so the text on it goes dark. */
-html[data-theme='dark'] .laviz-bill-card__total {
-  color: #0e0f10;
 }
 
 </style>

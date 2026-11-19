@@ -257,6 +257,7 @@ body {
   width: 100%;
 }
 
+
 .laviz-status-card__details {
   font-size: 0.82rem;
   line-height: 1.6;
@@ -563,29 +564,30 @@ body {
   max-width: 100%;
 }
 
+/* Cards side by side, equal width, one title each. They wrap to a new row when
+   there are many; the address itself shows in the box below once one is chosen. */
 .laviz-saved-address-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 0.5rem;
   max-width: 100%;
 }
 
 .laviz-saved-address {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 48px;
+  text-align: center;
   direction: rtl;
-  padding: 0.75rem 0.9rem;
+  padding: 0.5rem 0.6rem;
   border: 1px solid var(--laviz-border);
   border-radius: var(--laviz-radius-sm);
   background: var(--lz-surface-light);
+  color: var(--laviz-text);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-
-  &:hover {
-    border-color: var(--laviz-primary);
-  }
 
   &--active {
     border-color: var(--laviz-primary);
@@ -596,22 +598,11 @@ body {
 
 .laviz-saved-address__title {
   display: block;
+  max-width: 100%;
   font-weight: 700;
   font-size: 0.9rem;
-  margin-bottom: 0.25rem;
-}
-
-.laviz-saved-address__text {
-  display: block;
-  font-size: 0.82rem;
-  line-height: 1.55;
-  color: var(--laviz-muted);
-  word-break: break-word;
+  line-height: 1.4;
   overflow-wrap: anywhere;
-}
-
-.laviz-saved-address--active .laviz-saved-address__text {
-  color: var(--laviz-text);
 }
 
 /* Delivery date options */
@@ -2233,6 +2224,14 @@ html[data-theme='dark'] .map-picker__map .leaflet-tile-pane {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Review sheet: the title starts on the right and the close (×) sits at the far
+   left. Bootstrap's `margin-left: auto` on .close parked it right beside the
+   title instead. */
+.laviz-review-modal .modal-header .close {
+  margin: -12px 0 -12px 0;
+  padding: 12px;
+}
+
 /* A small handle on top says "this slides". */
 .modal .modal-dialog .modal-content::before {
   content: "";
@@ -2382,14 +2381,29 @@ html[data-theme='dark'] .time-sheet__slot--active {
   transform: none;
 }
 
-.laviz-cart-modal__total .laviz-cart-modal__hint {
-  color: var(--laviz-primary);
-  font-weight: 600;
+/* Why the pay button is off: an amber warning chip on the button's left. The
+   icon and border carry the amber; the text keeps the normal ink so it reads. */
+.laviz-cart-modal__warn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 104px;
+  padding: 6px 8px;
+  border: 1px solid var(--lz-warning);
+  border-radius: 10px;
+  background: var(--lz-warning-wash);
+  color: var(--lz-ink);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
   animation: rise-in 0.3s ease both;
 }
 
+.laviz-cart-modal__warn svg { flex: 0 0 auto; color: var(--lz-warning); }
+
 @media (prefers-reduced-motion: reduce) {
-  .laviz-cart-modal__total .laviz-cart-modal__hint { animation: none; }
+  .laviz-cart-modal__warn { animation: none; }
 }
 
 /* Profile button: solid saffron with dark ink (saffron never carries white). */
@@ -2627,6 +2641,7 @@ html.page-dragging * {
 .laviz-storefront-shell { position: relative; isolation: isolate; }
 
 .laviz-ambient {
+  display: none;
   position: fixed;
   top: 0;
   bottom: 0;
@@ -2716,9 +2731,9 @@ html[data-theme='dark'] .laviz-ambient__blob--b {
   background: radial-gradient(circle, rgba(240, 179, 35, 0.05), transparent 62%);
 }
 
-/* The bands let the layer show through; text sits on the same surface colour. */
+/* Keep the menu on the same neutral surface as the order sections. */
 .laviz-storefront-shell .menu-section,
-.laviz-storefront-shell .offers { background: transparent; }
+.laviz-storefront-shell .offers { background: var(--lz-surface); }
 
 .laviz-storefront-shell .menu-section .order-item:nth-of-type(even) {
   background: color-mix(in srgb, var(--lz-row-alt) 72%, transparent);

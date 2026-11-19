@@ -77,39 +77,6 @@
               <span class="laviz-mode-ribbon">🌙 ماه مبارک رمضان</span>
               <p class="laviz-app-header__subtitle">سفارش آنلاین شله و حلیم ویژه ماه مبارک رمضان</p>
             </div>
-            <div v-if="currentOrder" class="laviz-status-card laviz-status-card--expandable">
-              <div class="d-flex justify-content-between align-items-center flex-wrap">
-                <span>سفارش فعال: <strong>{{ currentOrderStatusLabel }}</strong></span>
-                <div>
-                  <button type="button" class="btn btn-link btn-sm p-0 ml-2" @click="showCurrentOrderDetails = !showCurrentOrderDetails">
-                    {{ showCurrentOrderDetails ? 'بستن جزئیات' : 'مشاهده جزئیات' }}
-                  </button>
-                  <a :href="'tel:' + supportPhone" class="ml-2">تماس پشتیبانی</a>
-                </div>
-              </div>
-              <div v-if="showCurrentOrderDetails" class="laviz-status-card__details mt-2 pt-2 border-top small">
-                <div>شماره: {{ currentOrder.orderNumber || currentOrder.id.slice(0, 8) }}</div>
-                <div>تحویل: {{ formatJalaliDate(currentOrder.deliveryDate) }} {{ currentOrder.deliveryTime || '' }}</div>
-                <div v-if="currentOrder.deliveryAddress">آدرس: {{ currentOrder.deliveryAddress }}</div>
-                <div v-if="currentOrder.comment">توضیحات: {{ currentOrder.comment }}</div>
-                <div v-for="(item, idx) in currentOrderItems" :key="idx" class="d-flex justify-content-between">
-                  <span>{{ item.title }} × {{ item.count }}</span>
-                  <span>{{ formatNum(item.lineTotal) }} تومان</span>
-                </div>
-                <div class="mt-1">
-                  <span v-if="currentOrder.shippingCost">ارسال: {{ formatNum(currentOrder.shippingCost) }} تومان</span>
-                  <span v-if="currentOrder.taxAmount" class="mr-2">مالیات: {{ formatNum(currentOrder.taxAmount) }} تومان</span>
-                </div>
-                <button
-                  type="button"
-                  class="btn btn-outline-primary btn-sm laviz-receipt-btn mt-2"
-                  :disabled="downloadingReceiptId === currentOrder.id"
-                  @click="downloadReceipt(currentOrder)"
-                >
-                  {{ downloadingReceiptId === currentOrder.id ? '...' : 'چاپ / ذخیره PDF رسید' }}
-                </button>
-              </div>
-            </div>
           </div>
 
           <!-- Only worth a row when it has something to say (an ETA); the shipping
@@ -207,10 +174,35 @@
             در حال حاضر محصولی برای این حالت ({{ mode === 0 ? 'رمضان' : 'عادی' }}) تعریف نشده است.
             لطفاً از پنل مدیریت، منوی {{ mode === 0 ? 'رمضان' : 'عادی' }} را تکمیل کنید.
           </div>
-          <discount-section
-            :personalCodes="myActiveCodes"
-            :publicOffers="publicOffers"
+          <!-- The order still on its way: where it is, when it is due, call/details.
+               It sits in the page flow (not the fixed header) so it scrolls away
+               and never eats the screen while the menu is being browsed. -->
+          <active-order-card
+            v-if="currentOrder"
+            :order="currentOrder"
+            :items="currentOrderItems"
+            :phone="shopInfo.phone || supportPhone || ''"
+            :delivery-text="currentOrderDeliveryText"
+            :downloading="downloadingReceiptId === currentOrder.id"
+            @receipt="downloadReceipt"
+            @acknowledge="acknowledgeRejectedOrder"
           />
+
+          <!-- The latest delivered order sits at the top of the first page with a
+               review button, until it is reviewed or closed. -->
+          <last-order-review-card
+            v-if="reviewOrder"
+            :order="reviewOrder"
+            :downloading="downloadingReceiptId === reviewOrder.id"
+            @review="openReview"
+            @receipt="downloadReceipt"
+            @dismiss="dismissReviewOrder"
+          />
+
+          <!-- ROLLBACK[first-page-offers]: the offers strip was removed from the
+               first page on request; codes are chosen in the basket now. To bring
+               it back, restore a discount-section here with
+               :personalCodes="myActiveCodes" :publicOffers="publicOffers". -->
 
           <div class="product-content-wrapper">
 
@@ -380,7 +372,7 @@
                     @click="chooseAsapTime"
                   >
                     <span class="laviz-day__label">تحویل فوری</span>
-                    <small class="laviz-day__note">۳۰ تا ۴۵ دقیقه از زمان ثبت سفارش</small>
+                    <small class="laviz-day__note">۳۰ تا ۴۵ دقیقه از زمان تأیید سفارش</small>
                   </button>
                   <button
                     type="button"
@@ -464,10 +456,12 @@
                       type="button"
                       class="laviz-saved-address"
                       :class="{ 'laviz-saved-address--active': selectedAddressId === a.id }"
+                      :aria-pressed="selectedAddressId === a.id ? 'true' : 'false'"
                       @click="pickSavedAddress(a)"
                     >
+                      <!-- Title only: choosing a card fills the address box and the
+                           map below with that address. -->
                       <span class="laviz-saved-address__title">{{ a.title || 'آدرس ذخیره‌شده' }}</span>
-                      <span class="laviz-saved-address__text">{{ a.address }}</span>
                     </button>
                   </div>
                 </div>
@@ -523,38 +517,31 @@
               <span class="laviz-section__title-num">۲</span>
               کد تخفیف
             </h2>
-            <!-- Codes already issued to this customer. Selecting one fills the
-                 field; only one code can ever be on an invoice, so picking a
-                 second simply replaces the first. -->
+            <!-- Codes already issued to this customer, as the same ticket cards as on
+                 the first page, each with "apply" and "details". Only one code can
+                 be on an invoice: once one is applied the others wait until it is
+                 cancelled. The field below still takes a code typed by hand. -->
             <div v-if="myActiveCodes.length" class="laviz-my-codes">
               <p class="laviz-my-codes__hint">کدهای تخفیف فعال شما:</p>
-              <div class="laviz-my-codes__list">
-                <button
-                  v-for="c in myActiveCodes"
-                  :key="c.id"
-                  type="button"
-                  class="laviz-my-code"
-                  :class="{ 'laviz-my-code--active': discountCode.code === c.code }"
-                  :disabled="discountCode.code_valid_status"
-                  @click="pickMyCode(c)"
-                >
-                  <span class="laviz-my-code__code">{{ c.code }}</span>
-                  <span class="laviz-my-code__amount">{{ formatNum(c.amount) }} تومان</span>
-                  <small class="laviz-my-code__exp">{{ remainingLabel(c) }}</small>
-                </button>
-              </div>
+              <discount-section
+                mode="basket"
+                :personalCodes="myActiveCodes"
+                :publicOffers="[]"
+                :applied-code="discountCode.code_valid_status ? String(discountCode.code || '') : ''"
+                :locked="discountCode.code_valid_status"
+                @apply="applyOffer"
+              />
             </div>
 
             <p v-else class="laviz-discount-hint mb-2">
               اگر کد تخفیف دارید اینجا وارد کنید.
             </p>
-            <div class="laviz-discount-row">
+            <div v-if="!discountCode.code_valid_status" class="laviz-discount-row">
               <input
                 type="text"
                 class="form-control"
                 v-model="discountCode.code"
                 placeholder="کد تخفیف"
-                :disabled="discountCode.code_valid_status"
                 v-validate="{ required: true }"
                 name="code"
                 data-vv-as="کد تخفیف"
@@ -564,25 +551,17 @@
               />
               <button
                 type="button"
-                class="btn btn-outline-secondary"
-                v-if="discountCode.code_valid_status"
-                @click="cancelDiscountCode()"
-              >
-                لغو
-              </button>
-              <button
-                type="button"
                 class="btn btn-primary laviz-btn-apply"
-                v-else
                 @click="approveDiscountCode()">
                 اعمال
               </button>
             </div>
             <div
-              class="text-success mt-2 small"
+              class="d-flex align-items-center justify-content-between mt-2"
               v-if="discountCode.code_valid_status"
             >
-              {{ formatNum(Math.round(bill.discount_amount)) }} تومان تخفیف اعمال شد
+              <span class="text-success small" style="font-weight: 700">{{ formatNum(Math.round(bill.discount_amount)) }} تومان تخفیف اعمال شد</span>
+              <button type="button" class="btn btn-outline-secondary" @click="cancelDiscountCode()">لغو</button>
             </div>
           </section>
         </div>
@@ -703,9 +682,15 @@
           <div class="laviz-cart-modal__total">
             <small>مبلغ قابل پرداخت</small>
             <strong :key="bill.payment_amount" class="laviz-total-tick">{{ formatNum(bill.payment_amount) }} تومان</strong>
-            <!-- Says why the button is off, in the spot the eye is already on. -->
-            <small v-if="auth.is_login && addressMissing" class="laviz-cart-modal__hint" role="status">آدرس تحویل را وارد کنید</small>
           </div>
+          <!-- Says why the pay button is off: a warning between the amount and the
+               pay button, which sits at the left edge. -->
+          <span v-if="auth.is_login && addressMissing" class="laviz-cart-modal__warn" role="status">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M12 3.5 2.8 19.5h18.4L12 3.5z" /><path d="M12 10v4.2M12 17.2v.1" />
+            </svg>
+            <span>آدرس تحویل را وارد کنید</span>
+          </span>
           <button
             v-if="auth.is_login"
             type="button"
@@ -795,6 +780,9 @@
         @confirm="onMapConfirm"
         @close="mapModalOpen = false"
       />
+      <review-modal ref="reviewModal" @submitted="onReviewSubmitted" />
+      <!-- A new discount code, shown once (see showNewCodesOnce). -->
+      <offer-sheet :offer="autoOffer" :show-basket-note="true" :show-code="false" @close="closeAutoOffer" />
       <success-login-modal
         @order="order"
         :auth="auth"/>
@@ -814,6 +802,7 @@
         :delivery_time="delivery_time"
         :check_one="check_one"
         :delivery_address="fullDeliveryAddress"
+        :delivery-address-title="selectedAddressTitle"
         :shipping-cost="shippingCost"
         :discount-code="discountCode"
         :delivery_type="delivery_type"
@@ -846,6 +835,9 @@ import PwaCallOut from "../components/pwa-call-out.vue";
 import SuccessLoginModal from "./index/components/successLoginModal.vue";
 import MapPickerModal from "~/components/MapPickerModal.vue";
 import MapPreview from "~/components/MapPreview.vue";
+import ActiveOrderCard from "./index/components/activeOrderCard.vue";
+import LastOrderReviewCard from "./index/components/lastOrderReviewCard.vue";
+import ReviewModal from "./profile/components/reviewModal.vue";
 import reveal from "../utils/reveal";
 import { trackTaps, flyToCart, reducedMotion } from "../utils/motion";
 import DeliveryTimeSheet from "./index/components/deliveryTimeSheet.vue";
@@ -860,6 +852,14 @@ import MenuCategoryNav from "./index/components/menuCategoryNav.vue";
 import DeliveryTypeBar from "./index/components/deliveryTypeBar.vue";
 import MenuSheet from "./index/components/menuSheet.vue";
 import DiscountSection from "./index/components/discountSection.vue";
+import OfferSheet from "./index/components/offerSheet.vue";
+
+// How often the order card asks the server for the order's new status (see
+// refreshOrderStatus).
+const ORDER_POLL_MS = 3 * 60 * 1000;
+import { personalOffer, readSeenIds, rememberSeenId, isUnseen } from "~/utils/offers";
+import { isAcknowledged, rememberAckedOrderId } from "~/utils/orderAck";
+import { takeReorder } from "~/utils/reorder";
 import ChefDailyTab from "./index/components/chefDailyTab.vue";
 import StickyContinueBar from "./index/components/stickyContinueBar.vue";
 import { applyAppModeTheme } from "~/utils/appModeTheme";
@@ -879,7 +879,7 @@ moment.loadPersian(true, {dialect: "persian-modern"});
 export default {
   name: "index",
   directives: {reveal},
-  components: {DeliveryTimeSheet, MapPickerModal, MapPreview, ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
+  components: {OfferSheet, ActiveOrderCard, LastOrderReviewCard, ReviewModal, DeliveryTimeSheet, MapPickerModal, MapPreview, ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
   data() {
     return {
       modal: {
@@ -905,6 +905,8 @@ export default {
       orderComment: '',
       currentOrder: null,
       currentOrderItems: [],
+      // The latest delivered order, offered for a review at the top of the page.
+      reviewOrder: null,
       downloadingReceiptId: null,
       showCurrentOrderDetails: false,
       supportPhone: '09155611540',
@@ -947,6 +949,8 @@ export default {
         code: null,
         code_valid_status: false,
         discount_percent: 0,
+        // The most the code can take off (toman), from the server; 0 = no cap.
+        max_amount: 0,
       },
       bill: {
         discount_amount: 0,
@@ -1001,6 +1005,10 @@ export default {
         shippingChip: 'ارسال: {value}',
       },
       myActiveCodes: [],
+      // A freshly issued code the customer has not seen yet, shown once by itself
+      // on the first page (see showNewCodesOnce), and the ones still waiting.
+      autoOffer: null,
+      autoOfferQueue: [],
       publicOffers: [],
       suppressScrollSpy: false,
       scrollSpyTimer: null,
@@ -1045,6 +1053,7 @@ export default {
       this.auth.user = session.user;
       this.auth.is_login = true;
       this.loadCurrentOrder();
+      this.loadReviewOrder();
     }
 
     trackTaps();
@@ -1060,9 +1069,14 @@ export default {
     }
     window.addEventListener('scroll', this.onMenuScroll, { passive: true });
     window.addEventListener('resize', this.onMenuScroll, { passive: true });
+    // Order status: poll while an order is on its way (see refreshOrderStatus).
+    this.orderPollTimer = setInterval(this.pollOrderStatus, ORDER_POLL_MS);
+    document.addEventListener('visibilitychange', this.onVisibilityForOrder);
   },
 
   beforeDestroy() {
+    clearInterval(this.orderPollTimer);
+    document.removeEventListener('visibilitychange', this.onVisibilityForOrder);
     if (this.headerObserver) this.headerObserver.disconnect();
     if (process.client) document.body.style.overflow = '';
     window.removeEventListener('scroll', this.onMenuScroll);
@@ -1211,13 +1225,21 @@ export default {
       } catch (e) {
       }
     },
-    async loadCurrentOrder() {
+    /**
+     * The order that is still on its way, for the card at the top of the page.
+     * `keepOnError`: a refresh that fails (no network for a moment) leaves the card
+     * as it is instead of hiding it.
+     */
+    async loadCurrentOrder({ keepOnError = false } = {}) {
+      this.lastOrderPoll = Date.now();
       try {
         const res = await this.$axios.get('/api/enduser/profile/orders/current', {
           params: { _refresh: Date.now() },
           headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
         });
-        if (res.data?.order && isOrderScheduledForTodayOrLater(res.data.order)) {
+        // An order the restaurant did not accept stays until the customer taps
+        // «متوجه شدم» (see acknowledgeRejectedOrder); after that it is history.
+        if (res.data?.order && !isAcknowledged(res.data.order) && isOrderScheduledForTodayOrLater(res.data.order)) {
           this.currentOrder = res.data.order;
           this.currentOrderItems = (res.data.items || []).map((i) => ({
             title: i.productTitle || 'محصول',
@@ -1229,9 +1251,106 @@ export default {
           this.currentOrderItems = [];
         }
       } catch (e) {
+        if (keepOnError) return;
         this.currentOrder = null;
         this.currentOrderItems = [];
       }
+    },
+    /**
+     * HOW THE ORDER'S STATUS REACHES THE PAGE
+     *
+     * Today: polling. While an order is on its way and the page is visible, the app
+     * asks GET /profile/orders/current every ORDER_POLL_MS (3 minutes), and again
+     * when the customer comes back to the tab after that long. When the order is no
+     * longer current (delivered), the delivered-order review card takes its place.
+     *
+     * Ready for something faster: whatever the server can push instead (server-sent
+     * events, a WebSocket, a web-push message) only has to call
+     * onOrderStatusChanged(); the page then fetches the new state the same way. The
+     * answer of /profile/orders/current stays the single source of truth.
+     *
+     * FOR THE BACKEND: keep /profile/orders/current cheap (it is called every few
+     * minutes per open page). An ETag / If-None-Match (or a 304 when nothing changed)
+     * would make a poll almost free. A push channel is welcome later; it needs no
+     * app change beyond the call above.
+     */
+    async refreshOrderStatus() {
+      if (!this.auth.is_login) return;
+      const hadOrder = !!this.currentOrder;
+      await this.loadCurrentOrder({ keepOnError: true });
+      // The order is over: its review card appears.
+      if (hadOrder && !this.currentOrder) this.loadReviewOrder();
+    },
+    onOrderStatusChanged() {
+      return this.refreshOrderStatus();
+    },
+    /**
+     * «متوجه شدم» on the orange card of an order the restaurant did not accept: the
+     * card is gone (it has already faded out), the server and this device are told,
+     * and the order lives on in the profile's order history. See utils/orderAck.js.
+     */
+    acknowledgeRejectedOrder(order) {
+      rememberAckedOrderId(order.id);
+      this.$axios
+        .put(`/api/enduser/profile/orders/${order.id}/acknowledge`)
+        .catch(() => { /* this device already remembers it */ });
+      this.currentOrder = null;
+      this.currentOrderItems = [];
+      this.$bvToast.toast('این سفارش به سوابق سفارش‌ها در پروفایل رفت.', { variant: 'warning', solid: true });
+    },
+    pollOrderStatus() {
+      if (!this.currentOrder || document.visibilityState !== 'visible') return;
+      this.refreshOrderStatus();
+    },
+    onVisibilityForOrder() {
+      if (document.visibilityState !== 'visible' || !this.currentOrder) return;
+      if (Date.now() - this.lastOrderPoll >= ORDER_POLL_MS) this.refreshOrderStatus();
+    },
+    /**
+     * The newest delivered order (status 4 or 20), unless the customer already
+     * reviewed or closed it. Orders that are still on their way are the status
+     * card's business (loadCurrentOrder).
+     */
+    async loadReviewOrder() {
+      this.reviewOrder = null;
+      if (!process.client) return;
+      try {
+        const { data } = await this.$axios.get('/api/enduser/profile/orders');
+        const hidden = this.hiddenReviewIds();
+        const delivered = (Array.isArray(data) ? data : [])
+          .filter((o) => [4, 20].includes(Number(o.status)))
+          .sort((a, b) => new Date(b.createDate) - new Date(a.createDate));
+        const latest = delivered[0];
+        this.reviewOrder = latest && !hidden.includes(latest.id) ? latest : null;
+      } catch (e) {
+        this.reviewOrder = null;
+      }
+    },
+    hiddenReviewIds() {
+      try {
+        const ids = JSON.parse(localStorage.getItem('laviz_review_dismissed') || '[]');
+        return Array.isArray(ids) ? ids : [];
+      } catch (e) {
+        return [];
+      }
+    },
+    /** Remembers an order as handled (reviewed or closed) so its card stays away. */
+    hideReviewOrder(orderId) {
+      try {
+        const ids = [orderId, ...this.hiddenReviewIds().filter((id) => id !== orderId)].slice(0, 20);
+        localStorage.setItem('laviz_review_dismissed', JSON.stringify(ids));
+      } catch (e) { /* storage blocked: the card simply returns next visit */ }
+      if (this.reviewOrder && this.reviewOrder.id === orderId) this.reviewOrder = null;
+    },
+    dismissReviewOrder() {
+      if (this.reviewOrder) this.hideReviewOrder(this.reviewOrder.id);
+    },
+    // `rating` is set when a star on the first page's review card was tapped.
+    openReview(order, rating) {
+      this.$refs.reviewModal.open(order, rating);
+    },
+    onReviewSubmitted(orderId) {
+      this.hideReviewOrder(orderId);
     },
     async downloadReceipt(order) {
       if (!order?.id) return;
@@ -1287,10 +1406,45 @@ export default {
         this.myActiveCodes = data || [];
       } catch (e) {
         this.myActiveCodes = [];
+        return;
       }
+      this.showNewCodesOnce();
+    },
+    /**
+     * A code issued to the customer that they have not been shown yet opens its
+     * details sheet by itself, once, on the first page. Each code is marked as seen
+     * the moment it is shown (on the server and on this device; see utils/offers.js),
+     * so it never comes back; if there are several, they show one after another.
+     */
+    showNewCodesOnce() {
+      if (this.autoOffer) return;
+      const seen = readSeenIds();
+      const fresh = (this.myActiveCodes || []).filter((code) => isUnseen(code, seen));
+      if (!fresh.length) return;
+      this.autoOfferQueue = fresh;
+      this.showNextAutoOffer();
+    },
+    showNextAutoOffer() {
+      const code = this.autoOfferQueue.shift();
+      if (!code) return;
+      this.autoOffer = personalOffer(code);
+      rememberSeenId(code.id);
+      this.$axios
+        .put(`/api/enduser/profile/active-discount-codes/${code.id}/seen`)
+        .catch(() => { /* the device already remembers it */ });
+    },
+    closeAutoOffer() {
+      this.autoOffer = null;
+      // Let the sheet slide away before the next code slides in.
+      if (this.autoOfferQueue.length) setTimeout(() => this.showNextAutoOffer(), 400);
     },
     pickMyCode(c) {
       this.discountCode.code = c.code;
+      this.approveDiscountCode();
+    },
+    /** "Apply" on a code card in the basket: fills the field and checks the code. */
+    applyOffer(code) {
+      this.discountCode.code = code;
       this.approveDiscountCode();
     },
     remainingLabel(c) {
@@ -1478,6 +1632,8 @@ export default {
         applyAppModeTheme(this.mode);
         this.publicOffers = resp.data.publicOffers || [];
         this.setProduct();
+        // "Order again" from the profile: build that order's basket and open it.
+        this.applyPendingReorder();
         // The offers row sits above the menu, so personal codes have to be
         // fetched at load rather than when the basket opens.
         this.loadMyDiscountCodes();
@@ -1496,6 +1652,49 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    /**
+     * «سفارش مجدد» in the profile's order history leaves the old order's lines
+     * behind (utils/reorder.js). Here they become the basket, exactly: the foods
+     * and quantities of that order replace whatever was in the basket, the delivery
+     * type and address come along when the order had them, and the basket opens.
+     * A food that is off the menu or out of stock today is skipped, and said so.
+     */
+    applyPendingReorder() {
+      const pending = takeReorder();
+      if (!pending) return;
+
+      for (const product of this.products) {
+        this.$set(this.productData[product.key], 'count', 0);
+      }
+
+      const added = [];
+      const missing = [];
+      for (const line of pending.lines) {
+        const product =
+          this.products.find((p) => String(p.key) === line.productId) ||
+          this.products.find((p) => String(p.name).trim() === line.title);
+        if (!product || product.isOutOfStock) {
+          missing.push(line.title || 'یک غذا');
+          continue;
+        }
+        const current = Number(this.productData[product.key].count) || 0;
+        this.$set(this.productData[product.key], 'count', current + line.count);
+        added.push(product.key);
+      }
+
+      if (pending.deliveryType && this.deliveryTypeOptions.some((o) => o.value === pending.deliveryType)) {
+        this.delivery_type = pending.deliveryType;
+      }
+      if (pending.deliveryType === 'sendToMe' && pending.deliveryAddress) {
+        this.delivery_address = pending.deliveryAddress;
+      }
+      this.calcBill();
+
+      if (missing.length) {
+        this.$bvToast.toast(`این غذاها امروز موجود نیستند و به سبد اضافه نشدند: ${missing.join('، ')}`, { variant: 'warning', solid: true });
+      }
+      if (added.length) this.$nextTick(() => this.openCart());
     },
     setProduct() {
   for (let product of this.products) {
@@ -1619,6 +1818,9 @@ export default {
         this.bill.discount_amount = Math.round(
           (subtotal / 100) * this.discountCode.discount_percent
         );
+        // "تا سقف …": the percentage never takes off more than the cap.
+        const cap = Number(this.discountCode.max_amount) || 0;
+        if (cap > 0) this.bill.discount_amount = Math.min(this.bill.discount_amount, cap);
       }
 
       this.bill.payment_amount = Math.max(0, subtotal - this.bill.discount_amount);
@@ -1783,6 +1985,14 @@ export default {
         const discountValue = Number(resp.data.value)
 
         this.discountCode.discount_percent = discountValue;
+        // FOR THE BACKEND: check-discount-code may send `maxAmount` (toman). If it
+        // does not, the cap on the customer's own code list is used.
+        const own = (this.myActiveCodes || []).find(
+          (c) => String(c.code).toLowerCase() === String(this.discountCode.code || '').trim().toLowerCase()
+        );
+        this.discountCode.max_amount = Number(
+          resp.data.maxAmount ?? resp.data.max_amount ?? (own && (own.maxAmount ?? own.max_amount)) ?? 0
+        ) || 0;
 
         this.bill.decreased_amount = this.bill.total_amount * (discountValue / 100);
         this.bill.discount_amount = this.bill.total_amount - this.bill.decreased_amount;
@@ -1804,6 +2014,7 @@ export default {
       this.discountCode.code = null;
       this.discountCode.code_valid_status = false;
       this.discountCode.discount_percent = 0;
+      this.discountCode.max_amount = 0;
     },
     registerSuccess() {
       this.$bvModal.hide("modal-login");
@@ -1828,6 +2039,8 @@ export default {
     },
     loginSuccess() {
       this.$bvModal.hide("modal-login");
+      this.loadCurrentOrder();
+      this.loadReviewOrder();
       if (this.profileLoginPending) {
         this.profileLoginPending = false;
         this.$router.push('/profile');
@@ -1971,6 +2184,10 @@ export default {
       return `${this.getDeliveryItemText(this.delivery_date)} ${this.jalaliDate(item.date, 'dddd')}`;
     },
     // The API has a single address string, so the plaque is appended to it.
+    selectedAddressTitle() {
+      const address = this.savedAddresses.find(a => a.id === this.selectedAddressId);
+      return address && address.address === this.delivery_address ? (address.title || '') : '';
+    },
     fullDeliveryAddress() {
       const text = (this.delivery_address || '').trim();
       const plaque = (this.plaque || '').trim();
@@ -2040,10 +2257,14 @@ export default {
       const map = { 6: 0, 0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 };
       return map[new Date().getDay()] ?? 0;
     },
-    currentOrderStatusLabel() {
-      if (!this.currentOrder) return '';
-      const map = { 10: 'در انتظار تایید رستوران', 12: 'در حال آماده‌سازی', 13: 'تحویل پیک', 1: 'پرداخت شده', 2: 'پرداخت شده (نقدی)' };
-      return map[this.currentOrder.status] || 'در حال پیگیری';
+    // "امروز ساعت ۱۳:۳۰" for an order due today, otherwise the date and the time.
+    currentOrderDeliveryText() {
+      const order = this.currentOrder;
+      if (!order) return '';
+      const due = order.deliveryDate ? new Date(order.deliveryDate) : null;
+      const isToday = !!due && !Number.isNaN(due.getTime()) && due.toDateString() === new Date().toDateString();
+      const day = isToday ? 'امروز' : this.formatJalaliDate(order.deliveryDate);
+      return [day, order.deliveryTime ? `ساعت ${order.deliveryTime}` : ''].filter(Boolean).join(' ');
     },
     selectedProducts() {
       return this.products

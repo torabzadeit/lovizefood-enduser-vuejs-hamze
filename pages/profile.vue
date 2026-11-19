@@ -177,9 +177,10 @@
         <section v-show="activeTab === 'orders'" class="profile-section">
           <h2 class="profile-section__title">تاریخچه سفارشات</h2>
           <order-history
-            :orders="orders"
+            :orders="historyOrders"
             :downloading-receipt-id="downloadingReceiptId"
             @review="openReview"
+            @reorder="reorderOrder"
             @download-receipt="downloadReceipt"
           />
         </section>
@@ -229,6 +230,8 @@
 <script>
 import OrderHistory from './profile/components/orderHistory.vue';
 import ReviewModal from './profile/components/reviewModal.vue';
+import { isAcknowledged, readAckedOrderIds } from '~/utils/orderAck';
+import { stashReorder } from '~/utils/reorder';
 import NotificationList from './profile/components/notificationList.vue';
 import AddressList from './profile/components/addressList.vue';
 import AddressForm from './profile/components/addressForm.vue';
@@ -241,13 +244,15 @@ export default {
   directives: { dragScroll },
   data() {
     return {
-      activeTab: 'info',
+      // Orders first, then addresses, then the account tabs; the first tab is
+      // the one open on arrival.
+      activeTab: 'orders',
       tabs: [
+        { id: 'orders', label: 'سفارش‌ها' },
+        { id: 'addresses', label: 'آدرس‌ها' },
         { id: 'info', label: 'اطلاعات' },
         { id: 'password', label: 'رمز عبور' },
         { id: 'messages', label: 'پیام‌ها' },
-        { id: 'orders', label: 'سفارش‌ها' },
-        { id: 'addresses', label: 'آدرس‌ها' },
       ],
       loading: false,
       unseenCount: 0,
@@ -276,6 +281,16 @@ export default {
 
     await this.loadProfile();
     await this.loadOrders();
+  },
+  computed: {
+    // The history lists orders that are over. An order still on its way (paid,
+    // waiting for the restaurant, being prepared, with the courier) has its own
+    // card at the top of the first page and stays out of this list until it is
+    // delivered. Same statuses as pages/index/components/activeOrderCard.vue.
+    historyOrders() {
+      const ON_ITS_WAY = [1, 2, 10, 12, 13];
+      return (this.orders || []).filter((order) => !ON_ITS_WAY.includes(Number(order.status)));
+    },
   },
   methods: {
     selectTab(id) {
@@ -323,8 +338,19 @@ export default {
       delete this.$axios.defaults.headers.common['Authorization'];
       this.$router.replace('/');
     },
-    openReview(order) {
-      this.$refs.reviewModal.open(order);
+    // «سفارش مجدد»: hands the order's lines to the first page, which builds the
+    // same basket from them and opens it (see utils/reorder.js).
+    reorderOrder(order) {
+      if (!stashReorder(order)) {
+        this.$bvToast.toast('این سفارش را نمی‌شود دوباره ثبت کرد.', { variant: 'danger' });
+        return;
+      }
+      this.$router.push('/');
+    },
+    // `stars` (1-5, optional): the rating tapped on the order card; the sheet
+    // applies it to every food of the order.
+    openReview(order, stars) {
+      this.$refs.reviewModal.open(order, stars);
     },
     async downloadReceipt(order) {
       if (!order?.id) return;

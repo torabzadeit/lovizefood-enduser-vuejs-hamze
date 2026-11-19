@@ -16,7 +16,25 @@
           <small class="notif__date">{{ faDate(n.createDate) }}</small>
         </div>
 
-        <p class="notif__body">{{ n.body }}</p>
+        <!-- Management's answer to a review: which food and what the customer
+             wrote are quoted above the answer, so the message makes sense alone. -->
+        <div v-if="n.type === 'review_reply' && n.data" class="notif__review">
+          <div class="notif__review-head">
+            <span class="notif__review-product">{{ n.data.productTitle }}</span>
+            <span class="notif__review-stars" :aria-label="'امتیاز شما: ' + n.data.rating + ' از ۵'">
+              <span
+                v-for="star in 5"
+                :key="star"
+                class="notif__review-star"
+                :class="{ 'notif__review-star--on': star <= Number(n.data.rating) }"
+                aria-hidden="true"
+              >★</span>
+            </span>
+          </div>
+          <p v-if="n.data.comment" class="notif__review-comment">«{{ n.data.comment }}»</p>
+        </div>
+
+        <p class="notif__body" :class="{ 'notif__body--reply': n.type === 'review_reply' }">{{ n.body }}</p>
 
         <div class="notif__actions">
           <nuxt-link v-if="n.linkUrl" :to="n.linkUrl" class="notif__link">مشاهده</nuxt-link>
@@ -37,6 +55,33 @@
 </template>
 
 <script>
+/*
+ * BACKEND CONTRACT: GET /api/enduser/profile/notifications
+ *
+ *   { items: [ ... ], unseenCount: <number> }
+ *
+ * Every item:
+ *   id         string   unique
+ *   title      string   headline, shown as is
+ *   body       string   the message text, shown as is
+ *   createDate ISO date
+ *   seenDate   ISO date | null   set by PUT .../notifications/seen { ids }
+ *   ackDate    ISO date | null   set by PUT .../notifications/{id}/ack
+ *   linkUrl    string | null     optional in-app route, shows a «مشاهده» link
+ *   type       string | null     optional; only 'review_reply' is special here
+ *   data       object | null     extra fields for the type
+ *
+ * type 'review_reply': the restaurant management answered a customer's review
+ * of a product. Create one notification for that customer at the moment
+ * management saves the answer (the same moment `adminReply` appears on that
+ * line of GET /profile/orders/{id}/review).
+ *   title  fixed text: «پاسخ مدیریت به نظر شما»
+ *   body   the management's answer, exactly as written in the admin panel
+ *   data   { productTitle, rating (1-5), comment (the customer's own review
+ *            text, may be empty), orderNumber }
+ * The app quotes productTitle, the stars and the customer's comment above the
+ * answer, so the message reads on its own.
+ */
 export default {
   name: 'NotificationList',
   data() {
@@ -141,6 +186,47 @@ export default {
   font-size: 14px;
   line-height: 24px;
   color: var(--laviz-muted);
+}
+
+/* The review being answered: food, the customer's stars and words. */
+.notif__review {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--lz-surface-soft, #f6f6f6);
+}
+
+.notif__review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notif__review-product {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--laviz-text);
+}
+
+.notif__review-stars { flex: 0 0 auto; display: inline-flex; }
+.notif__review-star { font-size: 14px; line-height: 1; color: var(--laviz-border, #d5d8df); }
+.notif__review-star--on { color: #ffc700; }
+
+.notif__review-comment {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--laviz-muted);
+}
+
+/* The answer itself reads as the message: normal ink, a rule on the right. The
+   text is Persian, and this list's direction is not rtl, so physical sides. */
+.notif__body--reply {
+  color: var(--laviz-text);
+  padding-right: 10px;
+  border-right: 3px solid var(--lz-success, #2e9a6d);
 }
 
 .notif__actions {

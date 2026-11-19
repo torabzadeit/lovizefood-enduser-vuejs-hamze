@@ -1,5 +1,5 @@
 <template>
-  <b-modal id="review-modal" centered hide-footer :title="'ثبت نظر برای سفارش ' + shortOrderId">
+  <b-modal id="review-modal" modal-class="laviz-review-modal" centered hide-footer :title="'ثبت نظر برای سفارش ' + shortOrderId">
     <div v-if="loading" class="review-modal__state">در حال بارگذاری…</div>
 
     <div v-else-if="!rateable" class="review-modal__state">
@@ -12,24 +12,35 @@
 
     <template v-else>
       <div v-for="item in enabledItems" :key="item.productId" class="review-item">
+        <!-- One row per food: picture on the right, the name beside it, and the
+             stars on the left end of the same row. A food without a picture
+             leaves the slot empty. -->
         <div class="review-item__head">
-          <span class="review-item__title">{{ item.title }}</span>
-          <span v-if="item.adminReply" class="review-item__answered">پاسخ داده شده</span>
-        </div>
+          <span class="review-item__thumb" :class="{ 'review-item__thumb--empty': !imageSrc(item) }">
+            <img v-if="imageSrc(item)" :src="imageSrc(item)" alt="" @error="onImageError(item)" />
+          </span>
 
-        <div class="review-stars" role="radiogroup" :aria-label="'امتیاز ' + item.title">
-          <button
-            v-for="star in 5"
-            :key="star"
-            type="button"
-            class="review-stars__btn"
-            :class="{ 'review-stars__btn--on': star <= (draft[item.productId].rating || 0) }"
-            role="radio"
-            :aria-checked="draft[item.productId].rating === star"
-            :aria-label="star + ' ستاره'"
-            @click="setRating(item.productId, star)"
-          >★</button>
-          <span class="review-stars__hint">{{ ratingLabel(draft[item.productId].rating) }}</span>
+          <div class="review-item__main">
+            <span class="review-item__title">{{ item.title }}</span>
+            <span class="review-item__sub">
+              <span v-if="item.adminReply" class="review-item__answered">پاسخ داده شده</span>
+              <span class="review-stars__hint">{{ ratingLabel(draft[item.productId].rating) }}</span>
+            </span>
+          </div>
+
+          <div class="review-stars" role="radiogroup" :aria-label="'امتیاز ' + item.title">
+            <button
+              v-for="star in 5"
+              :key="star"
+              type="button"
+              class="review-stars__btn"
+              :class="{ 'review-stars__btn--on': star <= (draft[item.productId].rating || 0) }"
+              role="radio"
+              :aria-checked="draft[item.productId].rating === star"
+              :aria-label="star + ' ستاره'"
+              @click="setRating(item.productId, star)"
+            >★</button>
+          </div>
         </div>
 
         <textarea
@@ -64,6 +75,7 @@ export default {
   data() {
     return {
       orderId: null,
+      orderNumber: '',
       loading: false,
       saving: false,
       rateable: false,
@@ -71,11 +83,14 @@ export default {
       // Keyed by productId so the star buttons and textarea stay bound even as
       // the list re-renders.
       draft: {},
+      // Products whose picture failed to load: they leave the slot empty.
+      failedImages: {},
     };
   },
   computed: {
     shortOrderId() {
-      return this.orderId ? String(this.orderId).slice(0, 8) : '';
+      // The number the customer knows (as on the cards), not the id's first characters.
+      return this.orderNumber || (this.orderId ? String(this.orderId).slice(0, 8) : '');
     },
     enabledItems() {
       return this.items.filter((i) => i.reviewEnabled);
@@ -85,10 +100,17 @@ export default {
     },
   },
   methods: {
-    async open(order) {
+    /**
+     * `initialRating` (1-5, optional): a rating chosen before the sheet opened,
+     * e.g. from the stars on the first page's review card. It is applied to every
+     * line that has no rating of its own yet.
+     */
+    async open(order, initialRating) {
       this.orderId = order.id;
+      this.orderNumber = order.orderNumber || '';
       this.items = [];
       this.draft = {};
+      this.failedImages = {};
       this.loading = true;
       this.$bvModal.show('review-modal');
       try {
@@ -97,7 +119,7 @@ export default {
         this.items = data.items || [];
         for (const item of this.items) {
           this.$set(this.draft, item.productId, {
-            rating: item.rating || 0,
+            rating: item.rating || (item.reviewEnabled ? Number(initialRating) || 0 : 0),
             comment: item.comment || '',
           });
         }
@@ -110,6 +132,19 @@ export default {
     },
     close() {
       this.$bvModal.hide('review-modal');
+    },
+    // The picture of a line. Backend contract: each line of
+    // GET /profile/orders/{id}/review may carry `thumbnail` (the same path the
+    // menu uses, e.g. "/public/food/thumbnail/<id>.jpg"); without one, or when the
+    // file fails to load, the slot stays empty.
+    imageSrc(item) {
+      const path = item.thumbnail || item.image;
+      if (!path || this.failedImages[item.productId]) return '';
+      if (/^https?:\/\//i.test(path)) return path;
+      return (this.$axios.defaults.baseURL || '') + path;
+    },
+    onImageError(item) {
+      this.$set(this.failedImages, item.productId, true);
     },
     setRating(productId, star) {
       // Tapping the current star again clears it, so a rating can be undone.
@@ -162,18 +197,59 @@ export default {
 
 .review-item:last-of-type { border-bottom: 0; }
 
+/* Picture, name and stars share one row (rtl: picture on the right, stars on
+   the left end). */
 .review-item__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  direction: rtl;
+  margin-bottom: 8px;
+}
+
+.review-item__thumb {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--lz-surface-soft, #eeeef0);
+}
+
+/* No picture: the slot stays empty, no placeholder drawing. */
+.review-item__thumb--empty { opacity: 0.6; }
+
+.review-item__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.review-item__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .review-item__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   font-size: 16px;
   font-weight: 600;
-  line-height: 28px;
+  line-height: 24px;
   color: var(--laviz-text);
+}
+
+.review-item__sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
 }
 
 .review-item__answered {
@@ -186,28 +262,29 @@ export default {
 }
 
 .review-stars {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin: 4px 0 8px;
+  margin: 0;
 }
 
 .review-stars__btn {
   border: 0;
   background: transparent;
   color: var(--laviz-border, #d5d8df);
-  font-size: 26px;
+  font-size: 24px;
   line-height: 1;
-  padding: 0 2px;
+  width: 28px;
+  height: 44px;
+  padding: 0;
   cursor: pointer;
   transition: color 0.15s ease, transform 0.1s ease;
 }
 
-.review-stars__btn:hover { transform: scale(1.1); }
+.review-stars__btn:active { transform: scale(0.85); }
 .review-stars__btn--on { color: #ffc700; }
 
 .review-stars__hint {
-  margin-right: 8px;
   font-size: 12px;
   font-weight: 600;
   color: var(--laviz-muted);

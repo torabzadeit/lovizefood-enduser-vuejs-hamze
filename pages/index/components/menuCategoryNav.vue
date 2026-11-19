@@ -149,8 +149,13 @@ export default {
 }
 
 .menu-nav__chip--active {
+  background: var(--laviz-primary-light);
   color: var(--laviz-text);
   font-weight: 700;
+}
+
+html[data-theme='dark'] .menu-nav__chip--active {
+  background: var(--lz-surface-soft);
 }
 
 .menu-nav__chip--active::after {
