@@ -61,6 +61,7 @@
           <button v-if="!state.bill && !state.quoting && state.error" type="button" class="rc-button rc-secondary rc-quote-retry" @click="checkout.preview()">محاسبه دوباره مبلغ</button>
           <div class="rc-payment-options">
             <button type="button" class="rc-button rc-primary" :disabled="!payable" @click="checkout.online()">{{ state.paying ? 'در حال اتصال…' : 'پرداخت آنلاین' }}</button>
+            <!-- BACKEND: §19 future click creates a pending-payment order immediately and routes the authoritative amount through the restaurant admin terminal to POS; show «پرداخت سفارش با موفقیت انجام شد» only after authoritative confirmation. Current 30-second manual fallback remains. -->
             <button type="button" class="rc-button rc-secondary" :disabled="!payable" @click="checkout.openCard()">کارت میکشم</button>
           </div>
         </template>

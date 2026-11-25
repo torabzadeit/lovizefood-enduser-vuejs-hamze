@@ -2,6 +2,7 @@
 
 | شناسه | شرح | نوع | مدل | پیش‌نیاز | نقطهٔ آزمون | وضعیت |
 |---|---|---|---|---|---|---|
+| RESTAURANT-POS-CONTRACT | مستندسازی کلیک کارت میکشم: ثبت فوری سفارش، اعلان پنل ادمین، ارسال به پوز و بازگشت تأیید پرداخت | B | — | RESTAURANT-KEYPAD-TONES-TOTAL | کامنت BACKEND و بند19/جدول/تاریخچه؛ فقط مستندات و کامنت، diff-check موفق؛ Graphify به‌روز؛ docs/immersive-menu/restaurant-pos-contract-handoff.md | ☑ |
 | RESTAURANT-FOOTER-TOTAL-FIX | اصلاح دیده‌نشدن مبلغ قابل پرداخت داخل نوار ثابت طبق تصویر کاربر | B | — | RESTAURANT-KEYPAD-TONES-TOTAL | همان design-taste-frontend؛ علت مشخص، مبلغ در footer با تخفیف و اسکرول در516×881 دیده شود؛ بدون تغییر محاسبات؛ IAB و آزمون مرتبط | ☐ |
 | RESTAURANT-KEYPAD-TONES-TOTAL | رنگ زمینهٔ ارقام با تیرگی افزایشی و نمایش مبلغ قابل پرداخت در footer ثابت | B | — | RESTAURANT-RESPONSIVE-KEYPAD | design-taste-frontend؛ 23 آزمون موفق؛ IAB390/516/800 و ارتفاع400، کنتراست حداقل7.91، مبلغ هماهنگ با تعداد؛ Graphify update اجرا شد؛ تم تیره و تخفیف بصری آزموده نشد؛ docs/immersive-menu/restaurant-keypad-tones-total-handoff.md | ☑ |
 | RESTAURANT-RESPONSIVE-KEYPAD | دو ردیف کلید در عرض کم، رشد عرض کلید در عرض زیاد، افزایش ارتفاع از۴۴ به۵۵ پیکسل و سایهٔ بالای footer پرداخت | B | — | RESTAURANT-PHONE-KEYPAD | design-taste-frontend تأیید شد؛ IAB عرض‌های390/516: 6+5، عرض800: 11کلید؛ ارتفاع55، بدون overflow، footerثابت و سایه؛ 21 آزمون موفق؛ تم تیره فقط بررسی توکن و از نظر بصری تأییدنشده؛ تحویل: docs/immersive-menu/restaurant-responsive-keypad-handoff.md | ☑ |

@@ -119,6 +119,10 @@ function createCheckout({ adapter = disconnectedAdapter(), items, now = Date.now
     state.phoneTouched = true;
     return !!phone(state.phone) && state.items.some(item => item.count > 0) && validBill(state.bill) && !state.quoting && !state.paying && !state.unresolved;
   }
+  // BACKEND: §19 future integration creates the order as pending payment on
+  // this click and routes its authoritative amount to the bound POS via the
+  // admin terminal. Only a verified POS result may show «پرداخت سفارش با موفقیت انجام شد».
+  // Today this only opens the dialog; the 30-second manual fallback remains.
   function openCard() {
     if (!ready()) return false;
     state.phase = 'card'; state.cardOpenedAt = now(); state.error = ''; return true;

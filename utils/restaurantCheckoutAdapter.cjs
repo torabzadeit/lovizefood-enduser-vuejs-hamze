@@ -21,6 +21,9 @@ function createLocalAdapter({ axios, allowed, owner, dev = false, pageOrigin = '
       // server by changing baseURL. Merger implements the same operation API
       // with scoped customer grants, actual SMS, server quotes, idempotency,
       // POS attestation and reconciliation. No global login/register fallback.
+      // BACKEND §19: future card click needs immediate idempotent pending-order
+      // creation and authenticated admin-terminal/POS routing; only a verified
+      // result may signal payment success. This local adapter does neither.
       const response = await axios.post('/api/enduser/mock/restaurant/checkout/' + operation, body).catch(error => {
         if (error.response && error.response.data && error.response.data.unavailable) return { data: { unavailable: true } };
         throw error;
