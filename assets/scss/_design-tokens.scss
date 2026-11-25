@@ -34,6 +34,14 @@
   --lz-saffron-ink: #3a2600;
   --lz-saffron-wash: #fff4d6;
 
+  /* Message strip and orders waiting for restaurant confirmation only. */
+  --lz-message-surface: #faf0f1;
+  --lz-message-ink: #681b27;
+  --lz-message-border: #ead0d5;
+  --lz-waiting: #70408c;
+  --lz-waiting-wash: #f5eef9;
+  --lz-waiting-border: #d3bddf;
+
   /* ---- Canvas & surfaces -------------------------------------------------
      Warm neutrals so white cards read against the crimson, not against grey. */
   --lz-canvas: #f8f4f1;
@@ -204,6 +212,13 @@ html[data-theme='dark'] {
   --lz-saffron: #f0b323;
   --lz-saffron-ink: #2b1c00;
   --lz-saffron-wash: #3a2d0c;
+
+  --lz-message-surface: #232528;
+  --lz-message-ink: var(--lz-ink);
+  --lz-message-border: var(--lz-border);
+  --lz-waiting: #c6a2df;
+  --lz-waiting-wash: #232528;
+  --lz-waiting-border: #695077;
 
   --lz-canvas: #0e0f10;
   --lz-surface: #17181a;

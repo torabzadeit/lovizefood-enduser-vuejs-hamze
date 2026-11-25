@@ -6,7 +6,7 @@
     facets (lit on the upper-left, shaded on the lower-right) that give it the look
     of a cut gem, a thin darker outline, a small gloss and a soft drop shadow.
   -->
-  <div class="star3d" role="group" :aria-label="label" :style="{ '--star3d-size': size + 'px' }">
+  <div class="star3d" role="group" :aria-label="valueLabel" :style="{ '--star3d-size': size + 'px' }">
     <svg class="star3d__defs" width="0" height="0" aria-hidden="true" focusable="false">
       <defs>
         <linearGradient :id="ref('body')" x1="0" y1="0" x2="0" y2="1">
@@ -82,12 +82,19 @@
       :key="n"
       type="button"
       class="star3d__btn"
-      :class="{ 'star3d__btn--empty': n > value }"
+      :class="{ 'star3d__btn--empty': fill(n) === 0 }"
       :aria-label="n + ' ستاره'"
       @click="$emit('select', n)"
     >
       <svg :width="size" :height="size" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <use :href="'#' + ref(n <= value ? 'star' : 'empty')" />
+        <defs>
+          <!-- Fill from the right, matching the RTL order of the five buttons. -->
+          <clipPath :id="ref('fill-' + n)">
+            <rect :x="24 * (1 - fill(n))" y="0" :width="24 * fill(n)" height="24" />
+          </clipPath>
+        </defs>
+        <use v-if="fill(n) < 1" :href="'#' + ref('empty')" />
+        <use v-if="fill(n) > 0" :href="'#' + ref('star')" :clip-path="'url(#' + ref('fill-' + n) + ')'" />
       </svg>
     </button>
   </div>
@@ -100,15 +107,27 @@ export default {
     // Side of one star in px.
     size: { type: Number, default: 34 },
     label: { type: String, default: 'امتیاز شما' },
-    // Stars already given (0-5). Up to this many are gold and faceted; the rest, and
-    // all of them when it is 0, are empty outlines.
+    // Saved average (1-5, including fractions); 0 leaves every star empty.
     value: { type: Number, default: 0 },
   },
   data() {
     // One set of ids per instance: several rows live on the same page.
     return { uid: `star3d-${this._uid}` };
   },
+  computed: {
+    displayValue() {
+      return Number.isFinite(this.value) && this.value >= 1 && this.value <= 5 ? this.value : 0;
+    },
+    valueLabel() {
+      return this.displayValue
+        ? `${this.label}؛ ${this.displayValue.toLocaleString('fa-IR', { maximumFractionDigits: 2 })} از ۵`
+        : `${this.label}؛ هنوز امتیازی ثبت نشده است`;
+    },
+  },
   methods: {
+    fill(n) {
+      return Math.max(0, Math.min(1, this.displayValue - n + 1));
+    },
     ref(name) {
       return `${this.uid}-${name}`;
     },

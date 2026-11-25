@@ -1,15 +1,19 @@
 <template>
   <div class="profile-page laviz-container">
-    <!-- Header: back button + title -->
+    <!-- RTL header: back on the right, logout on the physical left. -->
     <header class="profile-header">
-      <button type="button" class="profile-header__back" @click="$router.back()" aria-label="بازگشت">
+      <button type="button" class="profile-header__back" @click="$router.push('/')" aria-label="بازگشت">
         <!-- Points right, the way "back" reads in a right-to-left page. -->
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
           <path d="M4 12h16M14 6l6 6-6 6" />
         </svg>
       </button>
       <h1 class="profile-header__title">پروفایل</h1>
-      <div class="profile-header__spacer"></div>
+      <button type="button" class="profile-header__logout" @click="logout" aria-label="خروج از حساب" title="خروج از حساب">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 4.5H6.5A2 2 0 0 0 4.5 6.5v11a2 2 0 0 0 2 2H9M15.5 8l4 4-4 4M19.5 12H9.5" />
+        </svg>
+      </button>
     </header>
 
     <!-- One tab per section, in the same plain-text style as the menu's category
@@ -105,6 +109,13 @@
         </section>
 
         <!-- Password section -->
+        <section v-if="sessionReady && activeTab === 'bank-card'" class="profile-section">
+          <header class="profile-section__header">
+            <h2 class="profile-section__title">شماره کارت برای بازگشت وجه</h2>
+          </header>
+          <bank-card-form :token="sessionToken" @session-changed="endCardSession" />
+        </section>
+
         <section v-show="activeTab === 'password'" class="profile-section">
           <header class="profile-section__header">
             <h2 class="profile-section__title">رمز عبور</h2>
@@ -171,7 +182,11 @@
             <h2 class="profile-section__title">پیام‌ها</h2>
             <span v-if="unseenCount" class="profile-section__badge">{{ unseenCount }} جدید</span>
           </header>
-          <notification-list @unseen="unseenCount = $event" />
+          <notification-list
+            v-if="sessionReady"
+            :active="activeTab === 'messages' && !loading"
+            @unseen="unseenCount = $event"
+          />
         </section>
 
         <section v-show="activeTab === 'orders'" class="profile-section">
@@ -204,14 +219,6 @@
           />
         </section>
 
-        <!-- Sign out lives here; the header only carries the profile button. -->
-        <button type="button" class="profile-logout" @click="logout">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 4.5H6.5A2 2 0 0 0 4.5 6.5v11a2 2 0 0 0 2 2H9M15.5 8l4 4-4 4M19.5 12H9.5" />
-          </svg>
-          خروج از حساب
-        </button>
-
         <!-- Address form modal -->
         <address-form
           v-if="showAddressForm"
@@ -237,22 +244,24 @@ import AddressList from './profile/components/addressList.vue';
 import AddressForm from './profile/components/addressForm.vue';
 import { openOrderReceiptForPrint } from '~/utils/orderReceipt';
 import dragScroll from '~/utils/dragScroll';
+import restoreCustomerSession from '~/utils/customerSession.cjs';
+import BankCardForm from './profile/components/bankCardForm.vue';
 
 export default {
   name: 'ProfilePage',
-  components: { OrderHistory, AddressList, AddressForm, ReviewModal, NotificationList },
+  components: { OrderHistory, AddressList, AddressForm, ReviewModal, NotificationList, BankCardForm },
   directives: { dragScroll },
   data() {
     return {
-      // Orders first, then addresses, then the account tabs; the first tab is
-      // the one open on arrival.
-      activeTab: 'orders',
+      sessionReady: false,
+      sessionToken: '',
       tabs: [
         { id: 'orders', label: 'سفارش‌ها' },
         { id: 'addresses', label: 'آدرس‌ها' },
         { id: 'info', label: 'اطلاعات' },
         { id: 'password', label: 'رمز عبور' },
         { id: 'messages', label: 'پیام‌ها' },
+        { id: 'bank-card', label: 'شماره کارت' },
       ],
       loading: false,
       unseenCount: 0,
@@ -274,15 +283,30 @@ export default {
     // The whole page needs an authenticated customer; send guests to the menu
     // where the login modal lives, instead of rendering empty sections and
     // firing 401s for every panel.
-    if (process.client && !localStorage.getItem('token')) {
+    const session = restoreCustomerSession(localStorage, this.$axios);
+    if (!session) {
       this.$router.replace('/');
       return;
     }
 
+    this.sessionReady = true;
+    this.sessionToken = session.token;
+    window.addEventListener('storage', this.onCardSessionStorage);
+    this.$nextTick(this.revealActiveTab);
     await this.loadProfile();
     await this.loadOrders();
   },
+  beforeDestroy() {
+    window.removeEventListener('storage', this.onCardSessionStorage);
+    this.sessionReady = false;
+    this.sessionToken = '';
+    this.profileData = null;
+  },
   computed: {
+    activeTab() {
+      const requested = this.$route.query.tab;
+      return this.tabs.some(tab => tab.id === requested) ? requested : 'orders';
+    },
     // The history lists orders that are over. An order still on its way (paid,
     // waiting for the restaurant, being prepared, with the courier) has its own
     // card at the top of the first page and stays out of this list until it is
@@ -292,10 +316,23 @@ export default {
       return (this.orders || []).filter((order) => !ON_ITS_WAY.includes(Number(order.status)));
     },
   },
+  watch: {
+    activeTab() { this.$nextTick(this.revealActiveTab); },
+  },
   methods: {
+    onCardSessionStorage(event) {
+      if (event.key === null || event.key === 'token' || event.key === 'user') this.endCardSession();
+    },
+    endCardSession() {
+      if (!this.sessionReady && !this.sessionToken) return;
+      this.sessionReady = false;
+      this.sessionToken = '';
+      this.profileData = null;
+      this.$router.replace('/');
+    },
     selectTab(id) {
-      this.activeTab = id;
-      this.$nextTick(this.revealActiveTab);
+      if (id === this.activeTab || !this.tabs.some(tab => tab.id === id)) return;
+      this.$router.push({ path: '/profile', query: { ...this.$route.query, tab: id } });
     },
     /**
      * Slides the strip so the chosen tab is centred. Measured as a delta between
@@ -331,6 +368,9 @@ export default {
         confirmed = false;
       }
       if (confirmed !== true) return;
+      this.sessionReady = false;
+      this.sessionToken = '';
+      this.profileData = null;
       try {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -375,7 +415,10 @@ export default {
       try {
         this.loading = true;
         const res = await this.$axios.get('/api/enduser/profile');
-        this.profileData = res.data;
+        if (!this.sessionReady || localStorage.getItem('token') !== this.sessionToken) return;
+        // Card state belongs only to BankCardForm, never the cached auth user.
+        const { bankCardNumber, ...personalProfile } = res.data || {};
+        this.profileData = personalProfile;
       } catch (e) {
         this.$bvToast.toast('خطا در بارگذاری پروفایل', { variant: 'danger' });
       } finally {
@@ -473,6 +516,7 @@ export default {
 }
 
 .profile-header {
+  direction: rtl;
   display: flex;
   align-items: center;
   gap: 0.8rem;
@@ -560,12 +604,14 @@ export default {
   text-align: center;
 }
 
-.profile-header__back {
+.profile-header__back,
+.profile-header__logout {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
+  flex: 0 0 44px;
   border: none;
   background: none;
   cursor: pointer;
@@ -581,8 +627,9 @@ export default {
   color: var(--lz-ink);
 }
 
-.profile-header__spacer {
-  width: 44px;
+.profile-header__logout:focus-visible {
+  outline: 2px solid var(--lz-accent);
+  outline-offset: 2px;
 }
 
 .profile-body {
@@ -739,25 +786,4 @@ export default {
   margin-top: 0.8rem;
 }
 
-.profile-logout {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-  min-height: 48px;
-  margin: 0.5rem 0 1.5rem;
-  border: 1px solid var(--lz-border-strong);
-  border-radius: 12px;
-  background: transparent;
-  color: var(--lz-ink);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.12s ease;
-}
-
-.profile-logout:active {
-  transform: scale(0.98);
-}
 </style>

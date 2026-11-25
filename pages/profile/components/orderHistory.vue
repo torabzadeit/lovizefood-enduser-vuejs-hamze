@@ -87,9 +87,10 @@
         <p class="order-card__rate-caption">به این سفارش امتیاز بدهید</p>
           <!-- Tapping a star rates every food of the order with it and opens the
                review sheet to add words or change single foods. -->
-          <!-- BACKEND: each order of GET /profile/orders may carry `rating` (0-5, the
-               stars this customer gave it; null or absent = not rated). Those stars
-               show gold, the others stay empty. -->
+          <!-- BACKEND: §5, GET /profile/orders items[].review.rating is this customer's
+               saved product rating. Average valid 1-5 values without rounding; unrated
+               lines have no weight. Only absent item rating data permits order.rating
+               as a legacy fallback. No usable rating leaves every star empty. -->
           <star-rating3d
             class="order-card__stars"
             :size="32"
@@ -157,10 +158,22 @@ export default {
     onImageError(item) {
       this.$set(this.failedImages, item.id, true);
     },
-    // Whole stars 0-5 from `order.rating`; anything else counts as "not rated".
+    // Explicit item rating data (including null/0) takes precedence over a stale
+    // order aggregate. Quantity never weights a customer's product rating.
     ratingOf(order) {
-      const stars = Math.round(Number(order && order.rating));
-      return stars >= 1 && stars <= 5 ? stars : 0;
+      const validRating = (value) => {
+        if (typeof value !== 'number' && typeof value !== 'string') return 0;
+        const number = Number(value);
+        return Number.isFinite(number) && number >= 1 && number <= 5 ? number : 0;
+      };
+      const lines = order && (order.items || order.orderItems);
+      const reviewedLines = (Array.isArray(lines) ? lines : []).filter(line =>
+        line && line.review && Object.prototype.hasOwnProperty.call(line.review, 'rating'));
+      if (reviewedLines.length) {
+        const ratings = reviewedLines.map(line => validRating(line.review.rating)).filter(Boolean);
+        return ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0;
+      }
+      return validRating(order && order.rating);
     },
     formatJalaliDate(value, includeTime = false) {
       if (!value) return '';

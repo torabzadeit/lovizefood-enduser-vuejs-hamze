@@ -1688,12 +1688,6 @@ body {
     margin-inline: 0;
   }
 
-  /* Keep the first offer card clear of the fixed header at the top of the
-     centered desktop canvas. */
-  .laviz-storefront-shell .header-spacer {
-    margin-top: 56px;
-  }
-
 }
 
 /* Section headings (menu categories, chef's daily): centred, flanked by a line
@@ -1950,6 +1944,7 @@ body {
 }
 
 .skeleton-title,
+.skeleton-tabs span,
 .skeleton-item__img,
 .skeleton-item__lines span {
   border-radius: var(--lz-radius-control);
@@ -1959,10 +1954,21 @@ body {
 }
 
 .skeleton-title {
-  width: 40%;
+  width: 110px;
   height: 22px;
-  margin: 8px auto 20px;
+  margin: 8px 0 20px;
 }
+
+.skeleton-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 20px;
+  overflow: hidden;
+}
+
+.skeleton-tabs span { display: block; flex: 0 0 70px; height: 16px; }
 
 .skeleton-item {
   display: flex;
@@ -2070,6 +2076,7 @@ body {
   }
 
   .skeleton-title,
+  .skeleton-tabs span,
   .skeleton-item__img,
   .skeleton-item__lines span {
     animation: none;

@@ -20,7 +20,7 @@
     <div class="row mt-1" v-else-if="paymentStatus">
       <div class="col-md-12 d-flex flex-column justify-content-center align-items-center pt-3 pb-3">
         <img src="@/assets/media/success.png" width="100">
-        <p style="font-weight: bold;font-size: 20px;margin-bottom: 10px">پرداخت موفق بود</p>
+        <p style="font-weight: bold;font-size: 20px;margin-bottom: 10px">پرداخت با موفقیت انجام شد</p>
         <!--        <p style="font-weight: bold;font-size: 17px;margin-bottom: 10px">کد پیگیری : {{ paymentDetail.ref_code }}</p>-->
         <!--        <p style="text-align: center;font-size: 17px">-->
         <!--          جزییات پرداخت : <br>-->
@@ -41,8 +41,9 @@
         <!--            ارسال به ادرس : {{ paymentDetail.delivery_address }}-->
         <!--          </span>-->
         <span>
-          جزئیات سفارش از طریق پیامک برای شما ارسال شد.
+          در انتظار تأیید رستوران
         </span>
+        <span>تا ۵ ثانیهٔ دیگر به صفحهٔ اصلی بازمی‌گردید.</span>
         <nuxt-link
           to="/" class="mt-2 btn btn-primary">صفحه اصلی
         </nuxt-link>
@@ -67,7 +68,7 @@ export default {
   name: 'payment-result',
   data() {
     return {
-      paymentStatus: false,
+      leavingResult: false,
       // The gateway loads this page directly, so there is no menu request to
       // read the shop details from; the menu caches them for us.
       shopInfo: {
@@ -100,19 +101,7 @@ export default {
       if (cached) this.shopInfo = { ...this.shopInfo, ...JSON.parse(cached) };
     } catch (e) { /* fall back to the defaults above */ }
 
-    // The callback never redirects with status 1: a verified payment is handed
-    // straight to the kitchen as WaitingForRestaurantConfirmation (10), so the
-    // old `== 1` check showed "پرداخت ناموفق" for every successful payment.
-    // Mirrors OrdersReportStatusItems on the API.
-    const SUCCESS_STATUSES = [
-      1,  // PaymentSuccess
-      2,  // PaymentSuccessManual
-      4,  // Delivered
-      10, // WaitingForRestaurantConfirmation
-      12, // Preparing
-      13, // DeliveredToCourier
-    ];
-    this.paymentStatus = SUCCESS_STATUSES.includes(Number(this.$route.query.status));
+    this.scheduleReturn();
 
     //   if (this.$route.query.customerName) this.paymentDetail.customerName = this.$route.query.customerName
     // if (this.$route.query.basketProductsDetail) this.paymentDetail.basketProductsDetail = this.$route.query.basketProductsDetail
@@ -128,6 +117,39 @@ export default {
     // if (this.$route.query.delivery_amount) this.paymentDetail.delivery_amount = this.$route.query.delivery_amount
     // if (this.$route.query.is_first_order) this.paymentDetail.is_first_order = this.$route.query.is_first_order
   },
-  methods: {}
+  computed: {
+    paymentStatus() {
+      // BACKEND: the callback status is display-only; the server must verify the
+      // gateway result before redirecting here. Existing accepted values retained.
+      return [1, 2, 4, 10, 12, 13].includes(Number(this.$route.query.status));
+    },
+  },
+  watch: {
+    '$route.query.status'() { this.scheduleReturn(); },
+  },
+  beforeRouteLeave(to, from, next) {
+    this.leavingResult = true;
+    this.clearReturn();
+    next();
+  },
+  beforeDestroy() { this.clearReturn(); },
+  methods: {
+    clearReturn() {
+      if (this.returnTimer) clearTimeout(this.returnTimer);
+      this.returnTimer = null;
+    },
+    scheduleReturn() {
+      this.clearReturn();
+      if (!this.paymentStatus) return;
+      this.$nextTick(() => {
+        if (this.leavingResult || this._isBeingDestroyed || this._isDestroyed || !this.paymentStatus) return;
+        this.clearReturn();
+        this.returnTimer = setTimeout(() => {
+          this.returnTimer = null;
+          this.$router.replace('/');
+        }, 5000);
+      });
+    },
+  },
 }
 </script>

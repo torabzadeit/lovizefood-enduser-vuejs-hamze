@@ -1,0 +1,135 @@
+// Frozen characterization source from pages/index.vue before WIRE.
+// SHA256 f72700508f7275053b2a8165290b60556a1f477091bc03bdae9f55b6c06b03fb
+    calcBill() {
+      this.bill.total_amount = 0;
+      this.bill.discount_amount = 0;
+      this.bill.tax_amount = 0;
+      this.bill.shipping_amount = 0;
+      this.bill.payment_amount = 0;
+
+      for (const product of this.products) {
+        this.bill.total_amount +=
+          Number(this.productData[product.key].price) *
+          Number(this.productData[product.key].count);
+      }
+
+      if (this.delivery_type === 'sendToMe' && this.bill.total_amount > 0) {
+        this.bill.shipping_amount = Number(this.shippingCost || 0);
+      }
+
+      const beforeTax = this.bill.total_amount + this.bill.shipping_amount;
+      if (this.taxEnabled && this.taxPercent > 0) {
+        this.bill.tax_amount = Math.round((beforeTax * this.taxPercent) / 100);
+      }
+
+      let subtotal = beforeTax + this.bill.tax_amount;
+
+      if (this.discountCode.code_valid_status) {
+        this.bill.discount_amount = Math.round(
+          (subtotal / 100) * this.discountCode.discount_percent
+        );
+        // "تا سقف …": the percentage never takes off more than the cap.
+        const cap = Number(this.discountCode.max_amount) || 0;
+        if (cap > 0) this.bill.discount_amount = Math.min(this.bill.discount_amount, cap);
+      }
+
+      this.bill.payment_amount = Math.max(0, subtotal - this.bill.discount_amount);
+    },
+    addProductCount(pKey, unit) {
+      const selectedProduct = this.productData[pKey];
+      if (!selectedProduct) return;
+      const selectedMenuType = selectedProduct.menu_type;
+
+      // Customers add food before opening the basket to select a delivery
+      // date. Validate its weekday when a date is already selected; final
+      // checkout validates the date for every special-day item.
+      if (selectedMenuType === 'specialDay' && this.delivery_date !== -1) {
+        const selectedDeliveryDate = this.deliveryItems[this.delivery_date].date;
+        const dayOfWeek = moment(selectedDeliveryDate, "YYYY/M/D").day();
+        // const dayOfWeek = moment(selectedDeliveryDate, "YYYY/M/D").startOf('day').day();
+        const adjustedDay = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+
+        if (selectedProduct.isSpecial) {
+          const productInList = this.products.find(p => p.key === pKey);
+          const allowedDays = JSON.parse(productInList.specialDay);
+
+          if (!allowedDays.includes(adjustedDay)) {
+            this.$bvToast.toast(`این غذا در روز ${this.getDeliveryItemText(this.delivery_date)} (${this.jalaliDate(selectedDeliveryDate, "dddd")}) سرو نمی‌شود.`, {
+              variant: "danger",
+            });
+            return;
+          }
+        }
+      }
+
+      this.display_product = false;
+      // this.productData[pKey].count += unit;
+      this.$set(this.productData[pKey], 'count', this.productData[pKey].count + unit);
+      this.display_product = true;
+      this.calcBill();
+    },
+    subProductCount(pKey, unit) {
+      if (this.productData[pKey].count <= 0) {
+        return;
+      }
+
+      this.display_product = false;
+
+      // this.productData[pKey].count -= unit;
+      this.$set(this.productData[pKey], 'count', this.productData[pKey].count - unit);
+      this.display_product = true;
+      this.calcBill();
+    },
+    applyPendingReorder() {
+      const pending = takeReorder();
+      if (!pending) return;
+
+      for (const product of this.products) {
+        this.$set(this.productData[product.key], 'count', 0);
+      }
+
+      const added = [];
+      const missing = [];
+      for (const line of pending.lines) {
+        const product =
+          this.products.find((p) => String(p.key) === line.productId) ||
+          this.products.find((p) => String(p.name).trim() === line.title);
+        if (!product || product.isOutOfStock) {
+          missing.push(line.title || 'یک غذا');
+          continue;
+        }
+        const current = Number(this.productData[product.key].count) || 0;
+        this.$set(this.productData[product.key], 'count', current + line.count);
+        added.push(product.key);
+      }
+
+      if (pending.deliveryType && this.deliveryTypeOptions.some((o) => o.value === pending.deliveryType)) {
+        this.delivery_type = pending.deliveryType;
+      }
+      if (pending.deliveryType === 'sendToMe' && pending.deliveryAddress) {
+        this.addressOverridden = true;
+        this.selectedAddressId = null;
+        this.delivery_address = pending.deliveryAddress;
+      }
+      this.calcBill();
+
+      if (missing.length) {
+        this.$bvToast.toast(`این غذاها امروز موجود نیستند و به سبد اضافه نشدند: ${missing.join('، ')}`, { variant: 'warning', solid: true });
+      }
+      if (added.length) this.$nextTick(() => this.openCart());
+    },
+  computed:
+    selectedProducts() {
+      return this.products
+        .filter(p => this.productData[p.key]?.count > 0)
+        .map(p => ({
+          key: p.key,
+          name: this.productData[p.key].name,
+          count: this.productData[p.key].count,
+          price: this.productData[p.key].price,
+          unit_name: this.productData[p.key].unit_name,
+          discount_percent: this.productData[p.key].discount_percent,
+          total: this.productData[p.key].count * this.productData[p.key].price,
+          totalWithDiscount: this.productData[p.key].count * this.productData[p.key].price * (1 - this.productData[p.key].discount_percent / 100)
+        }));
+    },

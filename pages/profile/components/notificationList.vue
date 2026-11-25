@@ -38,16 +38,6 @@
 
         <div class="notif__actions">
           <nuxt-link v-if="n.linkUrl" :to="n.linkUrl" class="notif__link">مشاهده</nuxt-link>
-          <!-- Acknowledgement is explicit so management can report on who
-               actually confirmed a message, not merely who loaded the page. -->
-          <button
-            v-if="!n.ackDate"
-            type="button"
-            class="notif__ack"
-            :disabled="acking === n.id"
-            @click="acknowledge(n)"
-          >{{ acking === n.id ? '...' : 'تأیید دریافت' }}</button>
-          <span v-else class="notif__acked">دریافت تأیید شد</span>
         </div>
       </li>
     </ul>
@@ -66,7 +56,6 @@
  *   body       string   the message text, shown as is
  *   createDate ISO date
  *   seenDate   ISO date | null   set by PUT .../notifications/seen { ids }
- *   ackDate    ISO date | null   set by PUT .../notifications/{id}/ack
  *   linkUrl    string | null     optional in-app route, shows a «مشاهده» link
  *   type       string | null     optional; only 'review_reply' is special here
  *   data       object | null     extra fields for the type
@@ -84,48 +73,61 @@
  */
 export default {
   name: 'NotificationList',
+  props: { active: { type: Boolean, default: false } },
   data() {
-    return { loading: false, items: [], acking: null };
+    return { loading: false, items: [], markingSeen: false };
   },
-  created() {
+  mounted() {
+    document.addEventListener('visibilitychange', this.onVisibility);
     this.load();
   },
+  beforeDestroy() {
+    document.removeEventListener('visibilitychange', this.onVisibility);
+  },
+  watch: {
+    active(value) { if (value) this.load(); },
+  },
   methods: {
+    onVisibility() {
+      if (this.active && document.visibilityState === 'visible') this.load();
+    },
     async load() {
+      if (this.loading || !localStorage.getItem('token')) return;
+      const token = localStorage.getItem('token');
+      let loaded = false;
       this.loading = true;
       try {
-        // Fetching marks them delivered server-side; seen is set separately
-        // once they are actually on screen.
+        // BACKEND: GET may record delivery, but must leave seenDate unchanged.
+        // Only an active messages tab in a visible document sends seen IDs.
         const { data } = await this.$axios.get('/api/enduser/profile/notifications');
+        if (this._isBeingDestroyed || this._isDestroyed || localStorage.getItem('token') !== token) return;
         this.items = data.items || [];
         this.$emit('unseen', data.unseenCount || 0);
-        this.markVisibleSeen();
-      } catch (e) {
-        this.items = [];
-      } finally {
+        loaded = true;
+      } catch (e) { /* Keep the last loaded messages on a transient error. */ }
+      finally {
         this.loading = false;
+      }
+      if (loaded) {
+        await this.$nextTick();
+        if (localStorage.getItem('token') === token) this.markVisibleSeen();
       }
     },
     async markVisibleSeen() {
+      if (!this.active || this.loading || this.markingSeen || this._isBeingDestroyed || this._isDestroyed ||
+          document.visibilityState !== 'visible' || !localStorage.getItem('token')) return;
       const ids = this.items.filter((n) => !n.seenDate).map((n) => n.id);
       if (!ids.length) return;
+      const token = localStorage.getItem('token');
+      this.markingSeen = true;
       try {
         await this.$axios.put('/api/enduser/profile/notifications/seen', { ids });
+        if (this._isBeingDestroyed || this._isDestroyed || localStorage.getItem('token') !== token) return;
         const now = new Date().toISOString();
         this.items.forEach((n) => { if (ids.includes(n.id)) this.$set(n, 'seenDate', now); });
-        this.$emit('unseen', 0);
+        this.$emit('unseen', this.items.filter((n) => !n.seenDate).length);
       } catch (e) { /* leaving them unseen is harmless */ }
-    },
-    async acknowledge(n) {
-      this.acking = n.id;
-      try {
-        await this.$axios.put(`/api/enduser/profile/notifications/${n.id}/ack`);
-        this.$set(n, 'ackDate', new Date().toISOString());
-      } catch (e) {
-        this.$bvToast.toast('ثبت تأیید ممکن نشد.', { variant: 'danger' });
-      } finally {
-        this.acking = null;
-      }
+      finally { this.markingSeen = false; }
     },
     faDate(value) {
       try {
@@ -242,16 +244,4 @@ export default {
   text-decoration: none;
 }
 
-.notif__ack {
-  border: 1px solid var(--laviz-border);
-  background: transparent;
-  border-radius: 6px;
-  padding: 3px 10px;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--laviz-text);
-  cursor: pointer;
-}
-
-.notif__acked { font-size: 12px; color: var(--laviz-success); }
 </style>

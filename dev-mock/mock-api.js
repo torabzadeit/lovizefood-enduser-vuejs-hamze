@@ -7,15 +7,19 @@
  * the Docker build context. Run with `npm run dev:mock`.
  *
  * Not the real backend. Auth accepts any mobile with code 12345; order
- * preview does simple arithmetic; order creation is not supported.
+ * preview does simple arithmetic. Only the verified synthetic restaurant
+ * account can create local unpaid orders (see restaurant-mock.cjs).
  */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const createMock = require('./mock-core');
+const { createRestaurantMock } = require('./restaurant-mock.cjs');
 
 const PORT = Number(process.env.MOCK_PORT || 3003);
-const mock = createMock(JSON.parse(fs.readFileSync(path.join(__dirname, 'sample-data.json'), 'utf8')));
+const sample = JSON.parse(fs.readFileSync(path.join(__dirname, 'sample-data.json'), 'utf8'));
+const mock = createMock(sample);
+const restaurant = createRestaurantMock(sample);
 
 http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,13 +40,13 @@ http.createServer((req, res) => {
   req.on('end', () => {
     let body = {};
     try { body = raw ? JSON.parse(raw) : {}; } catch (e) { /* ignore */ }
-    const out = mock.handle(req.method, pathname, body, new URL(req.url, 'http://x').searchParams);
+    const out = restaurant.handle(req.method, pathname, body, req.headers) || mock.handle(req.method, pathname, body, new URL(req.url, 'http://x').searchParams);
     console.log(req.method, pathname, out ? '' : '(not mocked -> 404)');
     if (!out) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ statusCode: 404, message: 'mock: not implemented' }));
     }
-    res.writeHead(out.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(out.body));
+    res.writeHead(out.status, { 'Content-Type': out.contentType || 'application/json', 'Cache-Control': 'no-store' });
+    res.end(out.contentType ? out.body : JSON.stringify(out.body));
   });
-}).listen(PORT, () => console.log(`mock api on http://localhost:${PORT}`));
+}).listen(PORT, '127.0.0.1', () => console.log(`mock api on http://127.0.0.1:${PORT}`));

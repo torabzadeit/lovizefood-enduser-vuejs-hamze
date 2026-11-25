@@ -6,9 +6,9 @@ const path = require('path');
 const mockPort = process.env.MOCK_PORT || '3003';
 const env = Object.assign({}, process.env, {
   MOCK_PORT: mockPort,
-  VUE_APP_BASE_URL: `http://localhost:${mockPort}`,
-  API_URL: `http://localhost:${mockPort}`,
-  API_URL_BROWSER: `http://localhost:${mockPort}`,
+  VUE_APP_BASE_URL: `http://127.0.0.1:${mockPort}`,
+  API_URL: `http://127.0.0.1:${mockPort}`,
+  API_URL_BROWSER: `http://127.0.0.1:${mockPort}`,
   // webpack 4 needs the legacy OpenSSL provider on Node >= 17
   NODE_OPTIONS: [process.env.NODE_OPTIONS, '--openssl-legacy-provider'].filter(Boolean).join(' '),
 });

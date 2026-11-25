@@ -9,10 +9,7 @@
     <span class="laviz-ambient__blob laviz-ambient__blob--b"></span>
     <span v-for="(style, i) in emberStyles" :key="'ember-' + i" class="laviz-ambient__ember" :style="style"></span>
   </div>
-  <b-overlay
-    class="laviz-storefront-overlay"
-    :show="loading && products.length > 0"
-    :z-index="999">
+  <div class="laviz-storefront-overlay" :aria-busy="loading ? 'true' : 'false'">
 
     <div class="main-fixed-header laviz-app-header"
          :class="{ 'laviz-app-header--collapsed': headerCollapsed, 'laviz-app-header--hidden': headerHidden }"
@@ -31,6 +28,9 @@
                 <h1 class="laviz-topbar__title sr-only">{{ shopInfo.name }}</h1>
               </div>
               <div class="laviz-topbar__actions">
+                <button type="button" class="laviz-icon-btn" aria-label="منوی تصویری" title="منوی تصویری" @click="$router.push('/immersive-menu')">
+                  <img src="@/assets/immersive-icons/grid-2.svg" alt="" width="22" height="22" :style="theme === 'dark' ? { filter: 'invert(1)' } : null" />
+                </button>
                 <button
                   type="button"
                   class="laviz-icon-btn"
@@ -108,6 +108,9 @@
               @open-sheet="menuSheetVisible = true"
               @open-search="openSearch"
             />
+            <div v-else-if="loading && !products.length" class="skeleton-tabs" aria-hidden="true">
+              <span v-for="n in 4" :key="n"></span>
+            </div>
 
             <div v-if="searchOpen" class="laviz-menu-search">
               <input
@@ -129,6 +132,13 @@
       <!-- Reserves exactly the header's current height: it collapses on
            scroll, so a fixed value left a gap under the tab strip. -->
       <div class="header-spacer" :style="{ height: headerHeight + 'px' }"></div>
+
+      <management-message-banner
+        v-if="auth.is_login && auth.token"
+        :key="auth.token"
+        ref="managementMessages"
+        :token="auth.token"
+      />
 
       <!-- ROLLBACK[weekly-plan-table]: replaced by the "غذای روز سرآشپز" tab
            (chefDailyTab.vue). To go back to the old weekly table, delete the
@@ -170,7 +180,11 @@
       <div class="row">
 
         <div class="col-12">
-          <div v-if="!loading && products.length === 0" class="alert alert-warning text-center my-3">
+          <div v-if="!loading && loadError && !products.length" class="alert alert-warning text-center my-3" role="alert">
+            <p>دریافت منو انجام نشد. لطفاً دوباره تلاش کنید.</p>
+            <button type="button" class="btn btn-outline-dark" @click="initialize">تلاش دوباره</button>
+          </div>
+          <div v-else-if="!loading && !loadError && products.length === 0" class="alert alert-warning text-center my-3">
             در حال حاضر محصولی برای این حالت ({{ mode === 0 ? 'رمضان' : 'عادی' }}) تعریف نشده است.
             لطفاً از پنل مدیریت، منوی {{ mode === 0 ? 'رمضان' : 'عادی' }} را تکمیل کنید.
           </div>
@@ -184,8 +198,10 @@
             :phone="shopInfo.phone || supportPhone || ''"
             :delivery-text="currentOrderDeliveryText"
             :downloading="downloadingReceiptId === currentOrder.id"
+            :bank-card-number="refundCardOwner === refundCustomerKey ? refundCardNumber : ''"
             @receipt="downloadReceipt"
             @acknowledge="acknowledgeRejectedOrder"
+            @navigate="openNavigation"
           />
 
           <!-- The latest delivered order sits at the top of the first page with a
@@ -207,12 +223,14 @@
           <div class="product-content-wrapper">
 
             <!-- First load: shimmering placeholders hold the menu's shape until the data lands. -->
-            <div v-if="loading && !products.length" class="skeleton-menu" role="status" aria-label="در حال بارگذاری منو">
-              <div class="skeleton-title"></div>
-              <div v-for="n in 5" :key="n" class="skeleton-item">
-                <div class="skeleton-item__img"></div>
-                <div class="skeleton-item__lines">
-                  <span></span><span></span><span></span>
+            <div v-if="loading && !products.length" role="status" aria-label="در حال بارگذاری منو">
+              <div class="skeleton-menu" aria-hidden="true">
+                <div class="skeleton-title"></div>
+                <div v-for="n in 5" :key="n" class="skeleton-item">
+                  <div class="skeleton-item__lines">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <div class="skeleton-item__img"></div>
                 </div>
               </div>
             </div>
@@ -469,6 +487,7 @@
                   class="form-control"
                   rows="3"
                   v-model="delivery_address"
+                  @input="onManualAddressInput"
                   aria-label="آدرس تحویل"
                   placeholder="شهر، خیابان، کوچه ..."
                 ></textarea>
@@ -483,6 +502,7 @@
                     type="text"
                     class="form-control"
                     v-model.trim="plaque"
+                    @input="onManualAddressInput"
                     maxlength="20"
                     autocomplete="off"
                     placeholder="مثلا ۱۲"
@@ -821,7 +841,7 @@
       <pwa-call-out :text="pwaCallOutText"/>
     </div>
 
-  </b-overlay>
+  </div>
   </div>
 </template>
 
@@ -836,6 +856,7 @@ import SuccessLoginModal from "./index/components/successLoginModal.vue";
 import MapPickerModal from "~/components/MapPickerModal.vue";
 import MapPreview from "~/components/MapPreview.vue";
 import ActiveOrderCard from "./index/components/activeOrderCard.vue";
+import { confirmedBankCard } from '~/utils/bankCard.cjs';
 import LastOrderReviewCard from "./index/components/lastOrderReviewCard.vue";
 import ReviewModal from "./profile/components/reviewModal.vue";
 import reveal from "../utils/reveal";
@@ -853,6 +874,7 @@ import DeliveryTypeBar from "./index/components/deliveryTypeBar.vue";
 import MenuSheet from "./index/components/menuSheet.vue";
 import DiscountSection from "./index/components/discountSection.vue";
 import OfferSheet from "./index/components/offerSheet.vue";
+import ManagementMessageBanner from "~/components/ManagementMessageBanner.vue";
 
 // How often the order card asks the server for the order's new status (see
 // refreshOrderStatus).
@@ -868,6 +890,7 @@ import { openOrderReceiptForPrint } from "~/utils/orderReceipt";
 import { formatJalaliDate } from "~/utils/persianDate";
 import { isOrderScheduledForTodayOrLater } from "~/utils/orderScheduleDate";
 import restoreCustomerSession from "~/utils/customerSession.cjs";
+import checkoutDraft from "~/utils/checkoutDraft.cjs";
 import { visibleDeliveryOptions, deliveryDayLabel } from "~/utils/deliveryOptions";
 
 // Sentinel id for the synthetic "غذای روز سرآشپز" tab. It is not a real
@@ -879,7 +902,7 @@ moment.loadPersian(true, {dialect: "persian-modern"});
 export default {
   name: "index",
   directives: {reveal},
-  components: {OfferSheet, ActiveOrderCard, LastOrderReviewCard, ReviewModal, DeliveryTimeSheet, MapPickerModal, MapPreview, ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
+  components: {ManagementMessageBanner, OfferSheet, ActiveOrderCard, LastOrderReviewCard, ReviewModal, DeliveryTimeSheet, MapPickerModal, MapPreview, ImageDetailsModal, ProductItem, ChefDailyTab, BillModal, RegisterModal, SuccessLoginModal, PwaCallOut, ProfileModal, MapPicker, MenuCategoryNav, DeliveryTypeBar, MenuSheet, DiscountSection, StickyContinueBar},
   data() {
     return {
       modal: {
@@ -887,7 +910,8 @@ export default {
         name: '',
         description: '',
       },
-      loading: false,
+      loading: true,
+      loadError: false,
       shippingCost: 0,
       tax_amount: 0,
       taxEnabled: false,
@@ -902,8 +926,15 @@ export default {
       theme: 'light', // 'light' | 'dark'; mirrors <html data-theme>, set before paint by app.html
       delivery_lng: null,
       selectedAddressId: null,
+      addressOverridden: false,
+      addressesRequest: 0,
+      addressesLoaded: false,
+      addressesInitialized: false,
       orderComment: '',
       currentOrder: null,
+      refundCardNumber: '',
+      refundCardOwner: '',
+      refundCardRequest: 0,
       currentOrderItems: [],
       // The latest delivered order, offered for a review at the top of the page.
       reviewOrder: null,
@@ -936,9 +967,6 @@ export default {
         discountCodeRequest: false,
       },
       display_product: false,
-      products: [],
-      productCategories: [],
-      productData: {},
       deliveryItems: [],
       deliveryTimes: [],
       deliveryTypeOptions: [
@@ -1046,8 +1074,8 @@ export default {
   mounted() {
 
 
-    this.initialize();
-    const session = restoreCustomerSession(localStorage, this.$axios);
+    const deviceCredential = this.$restaurantMock && this.$restaurantMock.isDeviceCredential();
+    const session = deviceCredential ? null : restoreCustomerSession(localStorage, this.$axios);
     if (session) {
       this.auth.token = session.token;
       this.auth.user = session.user;
@@ -1055,6 +1083,10 @@ export default {
       this.loadCurrentOrder();
       this.loadReviewOrder();
     }
+    const draft = checkoutDraft.takeCheckoutDraft(this.$store, session && session.token);
+    if (draft) Object.assign(this, draft);
+    this.checkoutDraftRestored = !!draft;
+    this.initialize();
 
     trackTaps();
     this.theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
@@ -1069,12 +1101,21 @@ export default {
     }
     window.addEventListener('scroll', this.onMenuScroll, { passive: true });
     window.addEventListener('resize', this.onMenuScroll, { passive: true });
-    // Order status: poll while an order is on its way (see refreshOrderStatus).
-    this.orderPollTimer = setInterval(this.pollOrderStatus, ORDER_POLL_MS);
+    // One shared timer: messages refresh even when there is no current order.
+    this.syncCustomerPoll();
     document.addEventListener('visibilitychange', this.onVisibilityForOrder);
+    window.addEventListener('storage', this.onRefundSessionStorage);
   },
 
+  beforeRouteLeave(to, from, next) {
+    if (to.path === '/immersive-menu' && (localStorage.getItem('token') || null) === (this.auth.token || null)) {
+      checkoutDraft.saveCheckoutDraft(this.$store, this.auth.token, this);
+    } else checkoutDraft.clearCheckoutDraft(this.$store);
+    next();
+  },
   beforeDestroy() {
+    this.clearRefundCard();
+    window.removeEventListener('storage', this.onRefundSessionStorage);
     clearInterval(this.orderPollTimer);
     document.removeEventListener('visibilitychange', this.onVisibilityForOrder);
     if (this.headerObserver) this.headerObserver.disconnect();
@@ -1085,6 +1126,39 @@ export default {
     if (this.scrollSpyFrame) cancelAnimationFrame(this.scrollSpyFrame);
   },
   methods: {
+    clearRefundCard() {
+      this.refundCardRequest++;
+      this.refundCardNumber = '';
+      this.refundCardOwner = '';
+    },
+    onRefundSessionStorage(event) {
+      if (event.key === null || event.key === 'token' || event.key === 'user') {
+        this.clearRefundCard();
+        checkoutDraft.clearCheckoutDraft(this.$store);
+      }
+    },
+    async loadRefundCard(token) {
+      this.clearRefundCard();
+      if (!token || localStorage.getItem('token') !== token) return;
+      const request = this.refundCardRequest;
+      try {
+        // BACKEND: proposed bankCardNumber on authenticated GET /profile, §14.
+        // One read per rejected-order/session mount, never cached in auth.user/storage.
+        const response = await this.$axios.get('/api/enduser/profile', { privateBankCard: true });
+        if (this._isDestroyed || this._isBeingDestroyed || request !== this.refundCardRequest ||
+            this.refundCustomerKey !== token || localStorage.getItem('token') !== token) return;
+        this.refundCardNumber = confirmedBankCard(response.data?.bankCardNumber);
+        this.refundCardOwner = token;
+      } catch (_) {
+        // No prior customer's number survives a failed or unauthenticated read.
+        if (request === this.refundCardRequest) this.clearRefundCard();
+      }
+    },
+    syncCustomerPoll() {
+      clearInterval(this.orderPollTimer);
+      this.orderPollTimer = null;
+      if (this.auth.is_login) this.orderPollTimer = setInterval(this.pollOrderStatus, ORDER_POLL_MS);
+    },
     openProfileLogin() {
       if (this.auth.is_login) {
         this.$router.push('/profile');
@@ -1099,13 +1173,24 @@ export default {
       this.profileLoginPending = false;
       this.pendingContinue = false;
     },
-    pickSavedAddress(addr) {
+    pickSavedAddress(addr, automatic = false) {
+      if (!automatic) this.addressOverridden = true;
       this.selectedAddressId = addr.id;
       this.plaque = ''; // a saved address already carries its plaque in the text
       this.delivery_address = addr.address;
       this.delivery_lat = addr.lat;
       this.delivery_lng = addr.lng;
       this.recalcShippingPreview();
+    },
+    onManualAddressInput() {
+      this.addressOverridden = true;
+      this.selectedAddressId = null;
+    },
+    applyDefaultAddress() {
+      if (!this.addressesInitialized || this.addressOverridden || !this.auth.is_login) return;
+      // BACKEND: use the existing profile address isDefault flag; no new field is sent.
+      const address = this.savedAddresses.find(a => a.isDefault);
+      if (address) this.pickSavedAddress(address, true);
     },
     /** Light/dark switch. The choice is kept on this device (localStorage, with a
      *  cookie as a fallback) and read back by the script in app.html on the next load. */
@@ -1166,7 +1251,7 @@ export default {
       if (!item) return;
       const before = item.count;
       this.addProductCount(key, item.add_unit);
-      if (item.count > before) this.$nextTick(() => { if (!this.cartOpen) flyToCart(); });
+      if (this.productData[key].count > before) this.$nextTick(() => { if (!this.cartOpen) flyToCart(); });
     },
     /** Opens the phone's own navigation to the restaurant: on Android the
      *  system offers every installed map app, on iOS Apple Maps opens, and on a
@@ -1188,6 +1273,7 @@ export default {
     },
     /** The customer confirmed a spot on the full-screen map. */
     onMapConfirm({ lat, lng }) {
+      this.addressOverridden = true;
       this.delivery_lat = lat;
       this.delivery_lng = lng;
       this.selectedAddressId = null; // the position no longer matches a saved address
@@ -1197,9 +1283,14 @@ export default {
     },
     async refreshSavedAddresses() {
       if (!this.auth.is_login) return;
+      const token = this.auth.token;
+      const request = ++this.addressesRequest;
       try {
         const res = await this.$axios.get('/api/enduser/profile/addresses');
-        this.savedAddresses = res.data;
+        if (request !== this.addressesRequest || !this.auth.is_login || this.auth.token !== token) return;
+        this.savedAddresses = Array.isArray(res.data) ? res.data : [];
+        this.addressesLoaded = true;
+        this.applyDefaultAddress();
       } catch (e) {
       }
     },
@@ -1299,12 +1390,14 @@ export default {
       this.$bvToast.toast('این سفارش به سوابق سفارش‌ها در پروفایل رفت.', { variant: 'warning', solid: true });
     },
     pollOrderStatus() {
-      if (!this.currentOrder || document.visibilityState !== 'visible') return;
-      this.refreshOrderStatus();
+      if (!this.auth.is_login || document.visibilityState !== 'visible') return;
+      this.$refs.managementMessages?.refresh();
+      if (this.currentOrder) this.refreshOrderStatus();
     },
     onVisibilityForOrder() {
-      if (document.visibilityState !== 'visible' || !this.currentOrder) return;
-      if (Date.now() - this.lastOrderPoll >= ORDER_POLL_MS) this.refreshOrderStatus();
+      if (!this.auth.is_login || document.visibilityState !== 'visible') return;
+      this.$refs.managementMessages?.refresh();
+      if (this.currentOrder && Date.now() - this.lastOrderPoll >= ORDER_POLL_MS) this.refreshOrderStatus();
     },
     /**
      * The newest delivered order (status 4 or 20), unless the customer already
@@ -1383,13 +1476,7 @@ export default {
 
     // Chef's-daily foods live in their own weekly section, not in categories.
     categoryProducts(categoryId) {
-      const q = (this.menuSearch || '').trim();
-      return this.products.filter(
-        (p) =>
-          p.categoryId === categoryId &&
-          p.menu_type !== 'specialDay' &&
-          (!q || (p.name || '').includes(q) || (p.description || '').includes(q))
-      );
+      return this.$store.getters['basket/categoryProducts'](categoryId, this.menuSearch || '');
     },
     addChefDailyProduct(productKey) {
       const product = this.productData[productKey];
@@ -1583,11 +1670,25 @@ export default {
       }
     },
     async initialize() {
+      const request = this.initializeRequest = (this.initializeRequest || 0) + 1;
+      const owner = this.auth.token;
+      this.$bvToast.hide('menu-initialize-error');
       this.loading = true;
+      this.loadError = false;
       try {
-        const resp = await this.$axios.get('/api/enduser/core/initialize');
-        this.productCategories = resp.data.categories;
-        this.products = resp.data.products;
+        // BACKEND: §18. A device is never an ordinary customer. If the API is
+        // unavailable keep its grant and retry; only a confirmed invalid mock
+        // grant is cleared by authorize(), before loading the public menu.
+        if (this.$restaurantMock && this.$restaurantMock.isDeviceCredential()) {
+          const deviceSession = await this.$restaurantMock.authorize();
+          if (this._isDestroyed || this._isBeingDestroyed || request !== this.initializeRequest) return;
+          if (deviceSession) { await this.$router.replace('/restaurant-mock'); return; }
+          if (this.$restaurantMock.isDeviceCredential()) throw new Error('Device session unavailable');
+        }
+        const result = await this.$store.dispatch('basket/bootstrap', { force: true });
+        if (!result.applied || this._isDestroyed || this._isBeingDestroyed || request !== this.initializeRequest) return;
+        if (owner !== this.auth.token) { this.initialize(); return; }
+        const resp = { data: result.data };
         this.deliveryItems = visibleDeliveryOptions(resp.data.schedule.activeDays);
         if (Array.isArray(resp.data.deliveryTypeOptions) && resp.data.deliveryTypeOptions.length) {
           this.deliveryTypeOptions = resp.data.deliveryTypeOptions;
@@ -1598,7 +1699,7 @@ export default {
         // Defaults on entry: delivery ("برام ارسال کنید") and the first day that
         // can still take orders (today when it is open), so the basket opens
         // with both choices already made.
-        if (this.deliveryTypeOptions.some(option => option.value === 'sendToMe')) {
+        if (!this.checkoutDraftRestored && this.deliveryTypeOptions.some(option => option.value === 'sendToMe')) {
           this.delivery_type = 'sendToMe';
         }
         if (this.delivery_date === -1) {
@@ -1606,7 +1707,7 @@ export default {
           if (firstOpenDay !== -1) this.delivery_date = firstOpenDay;
         }
         this.shippingCost = resp.data.shippingCost;
-        this.delivery_address = resp.data.address;
+        if (!this.addressOverridden && !this.selectedAddressId) this.delivery_address = resp.data.address;
         if (resp.data.mapCenter) this.mapCenter = resp.data.mapCenter;
         if (resp.data.supportPhone) this.supportPhone = resp.data.supportPhone;
         if (resp.data.pwaCallOutText) this.pwaCallOutText = resp.data.pwaCallOutText;
@@ -1618,7 +1719,7 @@ export default {
             localStorage.setItem('shopInfo', JSON.stringify(this.shopInfo));
           } catch (e) { /* private mode — the page falls back to defaults */ }
         }
-        this.savedAddresses = resp.data.savedAddresses || [];
+        if (!this.addressesLoaded) this.savedAddresses = resp.data.savedAddresses || [];
         this.delivery_description = resp.data.delivery_description;
         this.in_person_description = resp.data.in_person_description;
         this.mode = resp.data.mode;
@@ -1634,9 +1735,13 @@ export default {
         this.setProduct();
         // "Order again" from the profile: build that order's basket and open it.
         this.applyPendingReorder();
+        this.addressesInitialized = true;
+        this.applyDefaultAddress();
+        if (this.auth.is_login) this.refreshSavedAddresses();
         // The offers row sits above the menu, so personal codes have to be
         // fetched at load rather than when the basket opens.
         this.loadMyDiscountCodes();
+        if (await this.$store.dispatch('basket/consumeCheckoutIntent')) this.$nextTick(() => this.openCart());
 
         if (this.productCategories.length > 0) {
           this.$nextTick(() => {
@@ -1648,9 +1753,11 @@ export default {
           });
         }
       } catch (e) {
-        this.$bvToast.toast('خطا در اتصال به سرور. لطفاً دوباره تلاش کنید.', { variant: 'danger', noAutoHide: true });
+        if (this._isDestroyed || this._isBeingDestroyed || request !== this.initializeRequest) return;
+        this.loadError = true;
+        this.$bvToast.toast('خطا در اتصال به سرور. لطفاً دوباره تلاش کنید.', { id: 'menu-initialize-error', variant: 'danger', noAutoHide: true });
       } finally {
-        this.loading = false;
+        if (request === this.initializeRequest) this.loading = false;
       }
     },
     /**
@@ -1663,167 +1770,54 @@ export default {
     applyPendingReorder() {
       const pending = takeReorder();
       if (!pending) return;
-
-      for (const product of this.products) {
-        this.$set(this.productData[product.key], 'count', 0);
-      }
-
-      const added = [];
-      const missing = [];
-      for (const line of pending.lines) {
-        const product =
-          this.products.find((p) => String(p.key) === line.productId) ||
-          this.products.find((p) => String(p.name).trim() === line.title);
-        if (!product || product.isOutOfStock) {
-          missing.push(line.title || 'یک غذا');
-          continue;
-        }
-        const current = Number(this.productData[product.key].count) || 0;
-        this.$set(this.productData[product.key], 'count', current + line.count);
-        added.push(product.key);
-      }
-
-      if (pending.deliveryType && this.deliveryTypeOptions.some((o) => o.value === pending.deliveryType)) {
+      this.$store.commit('basket/reorder', pending.lines);
+      if (pending.deliveryType && this.deliveryTypeOptions.some(o => o.value === pending.deliveryType)) {
         this.delivery_type = pending.deliveryType;
       }
       if (pending.deliveryType === 'sendToMe' && pending.deliveryAddress) {
+        this.addressOverridden = true;
+        this.selectedAddressId = null;
         this.delivery_address = pending.deliveryAddress;
       }
+      this.showBasketIssues();
       this.calcBill();
-
-      if (missing.length) {
-        this.$bvToast.toast(`این غذاها امروز موجود نیستند و به سبد اضافه نشدند: ${missing.join('، ')}`, { variant: 'warning', solid: true });
-      }
-      if (added.length) this.$nextTick(() => this.openCart());
+      if (this.selectedProducts.length) this.$nextTick(() => this.openCart());
     },
     setProduct() {
-  for (let product of this.products) {
-    this.$set(this.productData, product.key, {
-      name: product.name,
-      price: product.price,
-      image: product.thumbnail
-        ? this.$axios.defaults.baseURL + product.thumbnail
-        : product.image
-          ? this.$axios.defaults.baseURL + product.image
-          : '', // no picture: the card leaves the slot empty
-      imageFull: product.image ? this.$axios.defaults.baseURL + product.image : null,
-      discount_percent: product.discount_percent,
-      description: product.description,
-      add_unit: product.add_unit,
-      unit_name: product.unit_name,
-      isOutOfStock: product.isOutOfStock,
-      count: 0,
-      total_amount: 0,
-      menu_type: product.menu_type,
-      isSpecial: product.isSpecial,
-      specialDaysText: product.specialDaysText,
-      ratingAverage: product.ratingAverage,
-      ratingCount: product.ratingCount
-    });
-  }
-  this.display_product = true;
-},
-    // setProduct() {
-    //   for (let product of this.products) {
-    //     this.productData[product.key] = {
-    //       name: product.name,
-    //       price: product.price,
-    //       thumbnail: product.thumb ? this.$axios.defaults.baseURL + product.thumb : require('@/assets/media/no-image.jpg'),
-    //       image: product.image ? this.$axios.defaults.baseURL + product.image : null,
-    //       discount_percent: product.discount_percent,
-    //       description: product.description,
-    //       add_unit: product.add_unit,
-    //       unit_name: product.unit_name,
-    //       isOutOfStock: product.isOutOfStock,
-    //       count: 0,
-    //       total_amount: 0,
-    //       menu_type: product.menu_type,
-    //       isSpecial: product.isSpecial,
-    //       specialDaysText: product.specialDaysText
-    //     };
-    //   }
-    //   this.display_product = true;
-    // },
-    addProductCount(pKey, unit) {
-      const selectedProduct = this.productData[pKey];
-      if (!selectedProduct) return;
-      const selectedMenuType = selectedProduct.menu_type;
-
-      // Customers add food before opening the basket to select a delivery
-      // date. Validate its weekday when a date is already selected; final
-      // checkout validates the date for every special-day item.
-      if (selectedMenuType === 'specialDay' && this.delivery_date !== -1) {
-        const selectedDeliveryDate = this.deliveryItems[this.delivery_date].date;
-        const dayOfWeek = moment(selectedDeliveryDate, "YYYY/M/D").day();
-        // const dayOfWeek = moment(selectedDeliveryDate, "YYYY/M/D").startOf('day').day();
-        const adjustedDay = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
-
-        if (selectedProduct.isSpecial) {
-          const productInList = this.products.find(p => p.key === pKey);
-          const allowedDays = JSON.parse(productInList.specialDay);
-
-          if (!allowedDays.includes(adjustedDay)) {
-            this.$bvToast.toast(`این غذا در روز ${this.getDeliveryItemText(this.delivery_date)} (${this.jalaliDate(selectedDeliveryDate, "dddd")}) سرو نمی‌شود.`, {
-              variant: "danger",
-            });
-            return;
-          }
-        }
-      }
-
-      this.display_product = false;
-      // this.productData[pKey].count += unit;
-      this.$set(this.productData[pKey], 'count', this.productData[pKey].count + unit);
       this.display_product = true;
+      this.showBasketIssues();
       this.calcBill();
     },
-
-    subProductCount(pKey, unit) {
-      if (this.productData[pKey].count <= 0) {
-        return;
+    showBasketIssues() {
+      const issues = this.$store.getters['basket/issues'];
+      if (!issues.length) return;
+      const special = issues.some(issue => issue.reason === 'special-day');
+      this.$bvToast.toast(special
+        ? 'این غذا در روز انتخاب شده سرو نمی‌شود.'
+        : 'برخی غذاها موجود نیستند یا مقدار انتخاب‌شده معتبر نیست؛ سبد را بررسی کنید.',
+        { variant: 'warning', solid: true });
+    },
+    addProductCount(pKey, unit) {
+      let dayIndex;
+      const delivery = this.deliveryItems[this.delivery_date];
+      if (this.delivery_date !== -1 && delivery) {
+        const day = moment(delivery.date, "YYYY/M/D").day();
+        dayIndex = day === 6 ? 0 : day + 1;
       }
-
-      this.display_product = false;
-
-      // this.productData[pKey].count -= unit;
-      this.$set(this.productData[pKey], 'count', this.productData[pKey].count - unit);
-      this.display_product = true;
+      this.$store.commit('basket/increment', { key: pKey, dayIndex });
+      this.showBasketIssues();
+      this.calcBill();
+    },
+    subProductCount(pKey, unit) {
+      this.$store.commit('basket/decrement', { key: pKey });
       this.calcBill();
     },
     calcBill() {
-      this.bill.total_amount = 0;
-      this.bill.discount_amount = 0;
-      this.bill.tax_amount = 0;
-      this.bill.shipping_amount = 0;
-      this.bill.payment_amount = 0;
-
-      for (const product of this.products) {
-        this.bill.total_amount +=
-          Number(this.productData[product.key].price) *
-          Number(this.productData[product.key].count);
-      }
-
-      if (this.delivery_type === 'sendToMe' && this.bill.total_amount > 0) {
-        this.bill.shipping_amount = Number(this.shippingCost || 0);
-      }
-
-      const beforeTax = this.bill.total_amount + this.bill.shipping_amount;
-      if (this.taxEnabled && this.taxPercent > 0) {
-        this.bill.tax_amount = Math.round((beforeTax * this.taxPercent) / 100);
-      }
-
-      let subtotal = beforeTax + this.bill.tax_amount;
-
-      if (this.discountCode.code_valid_status) {
-        this.bill.discount_amount = Math.round(
-          (subtotal / 100) * this.discountCode.discount_percent
-        );
-        // "تا سقف …": the percentage never takes off more than the cap.
-        const cap = Number(this.discountCode.max_amount) || 0;
-        if (cap > 0) this.bill.discount_amount = Math.min(this.bill.discount_amount, cap);
-      }
-
-      this.bill.payment_amount = Math.max(0, subtotal - this.bill.discount_amount);
+      Object.assign(this.bill, this.$store.getters['basket/billFor']({
+        delivery_type: this.delivery_type, shippingCost: this.shippingCost,
+        taxEnabled: this.taxEnabled, taxPercent: this.taxPercent,
+        discountCode: this.discountCode,
+      }));
     },
     async order() {
       let selected_product = false;
@@ -2037,8 +2031,15 @@ export default {
         },
       };
     },
-    loginSuccess() {
+    async loginSuccess() {
       this.$bvModal.hide("modal-login");
+      // BACKEND: §18 only the dev-only mock client can authorize this lane.
+      if (this.$restaurantMock && await this.$restaurantMock.authorize()) {
+        this.profileLoginPending = false;
+        this.pendingContinue = false;
+        this.$router.replace('/restaurant-mock');
+        return;
+      }
       this.loadCurrentOrder();
       this.loadReviewOrder();
       if (this.profileLoginPending) {
@@ -2126,13 +2127,53 @@ export default {
       this.imageOpen = true;
     },
     removeProduct(pKey) {
-      this.display_product = false;
-      this.productData[pKey].count = 0;
-      this.display_product = true;
+      this.$store.commit('basket/setCount', { key: pKey, count: 0 });
       this.calcBill();
     },
   },
   watch: {
+    refundCustomerKey(token) { this.loadRefundCard(token); },
+    'auth.token'(token, previous) {
+      if (token !== previous) checkoutDraft.clearCheckoutDraft(this.$store);
+      if (previous && token !== previous) {
+        this.cancelDiscountCode();
+      }
+      if (previous && token && previous !== token) {
+        this.addressesRequest++;
+        this.addressesLoaded = false;
+        this.savedAddresses = [];
+        this.addressOverridden = false;
+        this.selectedAddressId = null;
+        this.delivery_address = null;
+        this.plaque = '';
+        this.delivery_lat = null;
+        this.delivery_lng = null;
+        if (this.auth.is_login) this.refreshSavedAddresses();
+      }
+    },
+    'auth.is_login'() {
+      this.syncCustomerPoll();
+      if (this.auth.is_login) this.refreshSavedAddresses();
+      else {
+        checkoutDraft.clearCheckoutDraft(this.$store);
+        this.cancelDiscountCode();
+        this.addressesRequest++;
+        this.addressesLoaded = false;
+        this.savedAddresses = [];
+        this.addressOverridden = false;
+        this.selectedAddressId = null;
+        this.delivery_address = null;
+        this.plaque = '';
+        this.delivery_lat = null;
+        this.delivery_lng = null;
+      }
+    },
+    selectedProducts(value, previous) {
+      if (previous && previous.length && !value.length) {
+        this.addressOverridden = false;
+        this.applyDefaultAddress();
+      }
+    },
     mode(value) {
       applyAppModeTheme(value);
     },
@@ -2158,6 +2199,12 @@ export default {
     }
   },
   computed: {
+    products() { return this.$store.getters['basket/products']; },
+    productCategories() { return this.$store.state.basket.categories; },
+    productData() { return this.$store.getters['basket/productData'](this.$axios.defaults.baseURL); },
+    refundCustomerKey() {
+      return this.auth.is_login && Number(this.currentOrder?.status) === 11 ? (this.auth.token || '') : '';
+    },
     // Positions, sizes and timings of the sparks. Fixed numbers (no randomness)
     // so the layout is the same on every load.
     emberStyles() {
@@ -2201,11 +2248,7 @@ export default {
       return this.chefDailyProducts.length > 0;
     },
     chefDailyProducts() {
-      const q = (this.menuSearch || '').trim();
-      return this.products.filter((p) =>
-        p.menu_type === 'specialDay' &&
-        (!q || (p.name || '').includes(q) || (p.description || '').includes(q))
-      );
+      return this.$store.getters['basket/categoryProducts'](CHEF_TAB_ID, this.menuSearch || '');
     },
     // Categories that still have at least one non-chef-daily product. Chef's
     // daily foods live in their own leading tab, so they are not repeated here.
@@ -2218,15 +2261,8 @@ export default {
       return this.realVisibleCategories;
     },
     menuNavCategories() {
-      const categories = this.visibleCategories.map((cat) => ({ ...cat }));
-      if (this.hasChefDaily) {
-        categories.unshift({
-          id: CHEF_TAB_ID,
-          text: 'غذای روز',
-          count: this.chefDailyProducts.length,
-        });
-      }
-      return categories;
+      return this.$store.getters['basket/menuCategories'].filter(category =>
+        this.$store.getters['basket/categoryProducts'](category.id, this.menuSearch || '').length);
     },
     sheetCategories() {
       return this.menuNavCategories.map((cat) => ({
@@ -2267,21 +2303,10 @@ export default {
       return [day, order.deliveryTime ? `ساعت ${order.deliveryTime}` : ''].filter(Boolean).join(' ');
     },
     selectedProducts() {
-      return this.products
-        .filter(p => this.productData[p.key]?.count > 0)
-        .map(p => ({
-          key: p.key,
-          name: this.productData[p.key].name,
-          count: this.productData[p.key].count,
-          price: this.productData[p.key].price,
-          unit_name: this.productData[p.key].unit_name,
-          discount_percent: this.productData[p.key].discount_percent,
-          total: this.productData[p.key].count * this.productData[p.key].price,
-          totalWithDiscount: this.productData[p.key].count * this.productData[p.key].price * (1 - this.productData[p.key].discount_percent / 100)
-        }));
+      return this.$store.getters['basket/selectedProducts'];
     },
     selectedItemsTotal() {
-      return this.selectedProducts.reduce((sum, item) => sum + item.total, 0);
+      return this.$store.getters['basket/itemsTotal'];
     },
   }
 };

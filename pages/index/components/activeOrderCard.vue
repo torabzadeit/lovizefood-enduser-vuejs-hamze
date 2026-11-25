@@ -6,7 +6,7 @@
     restaurant, and open the details. It lives in the page flow, not the fixed
     header, so it scrolls away with the content.
   -->
-  <section class="aoc" :class="{ 'aoc--warning': isRejected, 'aoc--leaving': leaving }" role="status" aria-live="polite">
+  <section class="aoc" :class="{ 'aoc--waiting': isWaiting, 'aoc--warning': isRejected, 'aoc--leaving': leaving }" role="status" aria-live="polite">
     <div class="aoc__main">
       <!-- Not accepted: an orange warning card instead of the green one. -->
       <span class="aoc__icon" aria-hidden="true">
@@ -65,6 +65,16 @@
           <span>{{ money(item.lineTotal) }} تومان</span>
         </li>
       </ul>
+      <div class="aoc__refund">
+        <!-- BACKEND: restaurant-requested policy copy for status 11, not evidence
+             of an executed refund. Deadline/operations must be confirmed; §14. -->
+        <p class="aoc__refund-policy">مبلغ پرداخت شده تا پایان روز جاری به شماره کارت ثبت شده برگشت خواهد شد.</p>
+        <p v-if="refundCardText" class="aoc__refund-card">
+          <span>شماره کارت ثبت‌شده:</span>
+          <bdi dir="ltr">{{ refundCardText }}</bdi>
+        </p>
+        <nuxt-link v-else class="aoc__btn aoc__btn--ghost aoc__refund-link" to="/profile?tab=bank-card">ثبت شماره کارت</nuxt-link>
+      </div>
     </template>
 
     <div class="aoc__actions">
@@ -83,6 +93,13 @@
         {{ expanded ? 'بستن جزئیات' : 'مشاهده جزئیات' }}
       </button>
     </div>
+
+    <button v-if="order.deliveryType === 'iWillCome' && !isRejected" type="button" class="aoc__btn aoc__btn--ghost aoc__navigate" @click="$emit('navigate')">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+        <path d="M12 2.5 4.5 20.2c-.2.5.4 1 .9.7L12 17l6.6 3.9c.5.3 1.1-.2.9-.7L12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+      </svg>
+      مسیریابی به رستوران
+    </button>
 
     <div v-if="expanded && !isRejected" class="aoc__details">
       <dl class="aoc__facts">
@@ -126,6 +143,7 @@
 </template>
 
 <script>
+import { formatBankCard } from '~/utils/bankCard.cjs';
 // The stages a customer can follow, and where each order status sits on them.
 // Statuses are the ones the order list already knows (see orderHistory.vue):
 // 1/2 paid, 10 waiting for the restaurant, 12 being prepared, 13 handed to the
@@ -153,8 +171,6 @@ const REJECTED = 11;
 const DEFAULT_REJECT_REASON = 'رستوران نتوانست این سفارش را بپذیرد.';
 
 const BY_STATUS = {
-  1: { step: 0, title: 'پرداخت سفارش شما انجام شد' },
-  2: { step: 0, title: 'پرداخت سفارش شما انجام شد' },
   10: { step: 1, title: 'سفارش شما منتظر تأیید رستوران است' },
   [REJECTED]: { step: 1, title: 'سفارش شما تأیید نشد' },
   12: { step: 2, title: 'سفارش شما در حال آماده‌سازی است' },
@@ -172,11 +188,22 @@ export default {
     // "امروز ۱۳:۳۰" or a date: the parent knows how dates are formatted.
     deliveryText: { type: String, default: '' },
     downloading: { type: Boolean, default: false },
+    bankCardNumber: { type: String, default: '' },
   },
   data() {
     return { expanded: false, leaving: false };
   },
   computed: {
+    refundCardText() { return formatBankCard(this.bankCardNumber); },
+    // BACKEND: GET /api/enduser/profile/orders/current may still return paid
+    // statuses 1 or 2; display them as 10 without changing the server value.
+    presentationStatus() {
+      const status = Number(this.order.status);
+      return [1, 2].includes(status) ? 10 : status;
+    },
+    isWaiting() {
+      return this.presentationStatus === 10;
+    },
     isRejected() {
       return Number(this.order.status) === REJECTED;
     },
@@ -189,10 +216,12 @@ export default {
       return PICKUP_TYPES.includes(this.order.deliveryType);
     },
     steps() {
-      return this.isPickup ? [...STEPS.slice(0, -1), PICKUP_LAST_STEP] : STEPS;
+      const steps = this.isPickup ? [...STEPS.slice(0, -1), PICKUP_LAST_STEP] : [...STEPS];
+      if (this.isWaiting) steps[1] = 'در انتظار تأیید';
+      return steps;
     },
     known() {
-      const known = BY_STATUS[this.order.status] || { step: 0, title: 'سفارش شما در حال پیگیری است' };
+      const known = BY_STATUS[this.presentationStatus] || { step: 0, title: 'سفارش شما در حال پیگیری است' };
       // "Handed to the courier" makes no sense for a pickup order.
       if (this.isPickup && Number(this.order.status) === 13) {
         return { ...known, title: PICKUP_READY_TITLE };
@@ -246,6 +275,8 @@ export default {
 
 <style scoped>
 .aoc {
+  --aoc-accent: var(--lz-success);
+  --aoc-current: var(--aoc-accent);
   direction: rtl;
   display: flex;
   flex-direction: column;
@@ -253,10 +284,24 @@ export default {
   padding: var(--lz-space-3);
   margin: var(--lz-space-3) 0;
   background: var(--lz-success-wash);
-  border: 1px solid color-mix(in srgb, var(--lz-success) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aoc-accent) 28%, transparent);
   border-radius: var(--lz-radius-card);
   color: var(--lz-ink);
 }
+
+/* Only status 10: crocus for waiting, saffron for its action and current ring.
+   These variables belong to this card; payment and other statuses keep theirs. */
+.aoc--waiting {
+  --aoc-accent: var(--lz-waiting);
+  --aoc-current: var(--lz-saffron);
+  --aoc-action: var(--lz-saffron);
+  --aoc-solid-ink: var(--lz-saffron-ink);
+  background: var(--lz-waiting-wash);
+  border-color: var(--lz-waiting-border);
+}
+
+/* The message strip already provides the space before the first order card. */
+.management-message-banner + .row .aoc { margin-top: 0; }
 
 /* ---- the order was not accepted: the same card in orange ---- */
 .aoc--warning {
@@ -345,15 +390,21 @@ html[data-theme='dark'] .aoc--warning .aoc__btn--solid { color: #2b1700; }
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--lz-success);
+  background: var(--aoc-action, var(--aoc-accent));
   /* White on the light theme's dark green, dark on the dark theme's light green. */
-  color: #fff;
+  color: var(--aoc-solid-ink, #fff);
 }
 
 html[data-theme='dark'] .aoc__icon,
-html[data-theme='dark'] .aoc__btn--solid { color: #0e0f10; }
+html[data-theme='dark'] .aoc__btn--solid { color: var(--aoc-solid-ink, #0e0f10); }
 
 .aoc__text { min-width: 0; }
+
+.aoc__refund { padding-block: 12px; border-top: 1px solid var(--lz-border-strong); font-size: var(--lz-text-sm); line-height: 1.9; }
+.aoc__refund-policy { margin: 0 0 12px; }
+.aoc__refund-card { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; }
+.aoc__refund-card bdi { unicode-bidi: isolate; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
+.aoc__refund-link { width: 100%; min-height: 44px; }
 
 .aoc__title {
   margin: 0;
@@ -403,7 +454,7 @@ html[data-theme='dark'] .aoc__btn--solid { color: #0e0f10; }
   background: var(--lz-border-strong);
 }
 
-.aoc__step--done:not(:last-child)::after { background: var(--lz-success); }
+.aoc__step--done:not(:last-child)::after { background: var(--aoc-accent); }
 
 .aoc__dot {
   position: relative;
@@ -420,14 +471,14 @@ html[data-theme='dark'] .aoc__btn--solid { color: #0e0f10; }
 }
 
 .aoc__step--done .aoc__dot {
-  border-color: var(--lz-success);
-  background: var(--lz-success);
+  border-color: var(--aoc-accent);
+  background: var(--aoc-accent);
 }
 
 .aoc__step--current .aoc__dot {
-  border-color: var(--lz-success);
+  border-color: var(--aoc-accent);
   background: var(--lz-surface);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--lz-success) 24%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--aoc-current) 24%, transparent);
 }
 
 .aoc__step--current .aoc__dot::before {
@@ -435,7 +486,7 @@ html[data-theme='dark'] .aoc__btn--solid { color: #0e0f10; }
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--lz-success);
+  background: var(--aoc-accent);
   /* The stage the order is in right now: the inner dot breathes... */
   animation: aoc-breathe 1.8s ease-in-out infinite;
 }
@@ -449,7 +500,7 @@ html[data-theme='dark'] .aoc__btn--solid { color: #0e0f10; }
   right: -2px;
   bottom: -2px;
   left: -2px;
-  border: 2px solid var(--lz-success);
+  border: 2px solid var(--aoc-current);
   border-radius: 50%;
   pointer-events: none;
   animation: aoc-ripple 1.8s ease-out infinite;
@@ -481,6 +532,8 @@ html[data-theme='dark'] .aoc__step--done .aoc__dot { color: #0e0f10; }
   gap: var(--lz-space-2);
 }
 
+.aoc__navigate { flex: none; width: 100%; }
+
 .aoc__btn {
   flex: 1 1 0;
   min-height: 44px;
@@ -503,9 +556,9 @@ html[data-theme='dark'] .aoc__step--done .aoc__dot { color: #0e0f10; }
 .aoc__btn:disabled { opacity: 0.5; cursor: default; }
 
 .aoc__btn--solid {
-  border: 1px solid var(--lz-success);
-  background: var(--lz-success);
-  color: #fff;
+  border: 1px solid var(--aoc-action, var(--aoc-accent));
+  background: var(--aoc-action, var(--aoc-accent));
+  color: var(--aoc-solid-ink, #fff);
 }
 
 .aoc__btn--ghost {
@@ -517,7 +570,7 @@ html[data-theme='dark'] .aoc__step--done .aoc__dot { color: #0e0f10; }
 /* ---- details ---- */
 .aoc__details {
   padding-top: var(--lz-space-3);
-  border-top: 1px dashed color-mix(in srgb, var(--lz-success) 40%, transparent);
+  border-top: 1px dashed color-mix(in srgb, var(--aoc-accent) 40%, transparent);
   font-size: var(--lz-text-sm);
   line-height: 1.7;
 }

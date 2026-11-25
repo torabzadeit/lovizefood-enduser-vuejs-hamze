@@ -451,6 +451,17 @@ export default {
           mobile: this.loginForm.data.mobile,
           verify_code: this.loginForm.data.verify_code,
         });
+        // BACKEND: §18 verify the local device scope before ordinary customer
+        // watchers can request addresses, profile data or personal discounts.
+        this.$axios.setHeader("Authorization", "Bearer " + resp.data.token);
+        localStorage.setItem("token", resp.data.token);
+        localStorage.setItem("user", JSON.stringify(resp.data.user));
+        if (this.$restaurantMock && await this.$restaurantMock.authorize()) {
+          this.stopTimer();
+          this.hide();
+          this.$router.replace('/restaurant-mock');
+          return;
+        }
         this.auth.is_login = true;
         this.loginForm.data = resp.data.user;
         this.auth.token = resp.data.token;
@@ -458,13 +469,6 @@ export default {
           first_name: resp.data.user.first_name,
           last_name: resp.data.user.last_name
         }
-        this.$axios.setHeader(
-          "Authorization",
-          "Bearer " + resp.data.token
-        );
-
-        localStorage.setItem("token", resp.data.token);
-        localStorage.setItem("user", JSON.stringify(resp.data.user));
         this.stopTimer();
         this.cooldownEndsAt = null;
         this.resendIn = 0;

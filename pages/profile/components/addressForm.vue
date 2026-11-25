@@ -10,6 +10,7 @@
   >
     <template #modal-header="{ close }">
       <div class="address-form-modal-header" dir="ltr">
+        <div class="address-form-modal-header__controls">
         <button
           type="button"
           class="address-form-modal-header__close"
@@ -18,6 +19,12 @@
         >
           ×
         </button>
+        <label class="address-default-switch" dir="rtl">
+          <input v-model="form.isDefault" type="checkbox" role="switch" />
+          <span class="address-default-switch__track" aria-hidden="true"></span>
+          <span>پیش‌فرض</span>
+        </label>
+        </div>
         <h5 class="address-form-modal-header__title" dir="rtl">مدیریت آدرس</h5>
       </div>
     </template>
@@ -88,15 +95,6 @@
         </client-only>
       </div>
 
-      <div class="form-group form-group--checkbox">
-        <label class="form-checkbox">
-          <input
-            v-model="form.isDefault"
-            type="checkbox"
-          />
-          <span>پیش‌فرض برای سفارشات جدید</span>
-        </label>
-      </div>
     </form>
 
     <template #modal-footer>
@@ -219,12 +217,21 @@ export default {
   width: 100%;
 }
 
+.address-form-modal-header__controls { display: flex; align-items: center; gap: 0.5rem; }
+.address-default-switch { position: relative; display: inline-flex; align-items: center; gap: 0.4rem; min-height: 44px; margin: 0; color: var(--lz-ink); font-size: 0.85rem; cursor: pointer; }
+.address-default-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.address-default-switch__track { position: relative; width: 2.5rem; height: 1.4rem; border-radius: 1rem; background: var(--laviz-border, #a6a8b0); }
+.address-default-switch__track::after { content: ''; position: absolute; top: 0.2rem; left: 0.2rem; width: 1rem; height: 1rem; border-radius: 50%; background: white; }
+.address-default-switch input:checked + .address-default-switch__track { background: var(--lz-accent); }
+.address-default-switch input:checked + .address-default-switch__track::after { left: 1.3rem; }
+.address-default-switch input:focus-visible + .address-default-switch__track { outline: 2px solid var(--lz-accent); outline-offset: 3px; }
+
 .address-form-modal-header__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;

@@ -88,6 +88,9 @@ export default function ({ $axios }) {
     }
 
     const code = parseInt((data && (data.statusCode || data.status)) || httpStatus)
+    // Card endpoints handle errors with fixed text; never render a server error
+    // that might echo a submitted PAN. Keep the shared 401 cleanup above.
+    if (e.config && e.config.privateBankCard) return false
     switch (code) {
       case 400: {
         serverMessages(data).forEach(m => notify(m))

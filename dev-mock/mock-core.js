@@ -9,6 +9,12 @@
   return function createMock(sample) {
     const snapshot = sample.responses['GET /api/enduser/core/initialize'].body;
     const manifest = (sample.responses['GET /api/enduser/core/manifest.webmanifest'] || {}).body || {};
+    // Local demo only: read state lasts for this mock factory's lifetime.
+    // Node shares this sample inbox across clients; this is not user isolation.
+    const notificationSeenDates = new Map();
+    // Local demo only: saved reviews last for this factory's lifetime, like inbox
+    // state. Node shares fixtures across clients; this is not production isolation.
+    const savedReviews = new Map();
 
     // The snapshot has fixed dates. Shift them so the first active day is
     // always today (Tehran), keeping each day's slots and discounts.
@@ -104,18 +110,28 @@
     // "order again" can find it on today's menu (see utils/reorder.js). The sample
     // lines are written by name; the id is looked up in the menu snapshot.
     function sampleOrders() {
-      return rawSampleOrders().map((order) => ({
-        ...order,
-        items: (order.items || []).map((line) => {
-          const product = snapshot.products.find((p) => String(p.name).trim() === String(line.productTitle).trim());
-          // `thumbnail`: the menu's own photo path for the food (null when it has none).
-          return {
-            ...line,
-            productId: product ? product.key : null,
-            thumbnail: (product && (product.thumbnail || product.image)) || null,
-          };
-        }),
-      }));
+      return rawSampleOrders().map((order) => {
+        const reviews = savedReviews.get(order.id);
+        const items = (order.items || []).map(line => {
+          const saved = reviews && reviews.get(line.id);
+          return saved ? { ...line, review: { ...line.review, ...saved } } : line;
+        });
+        const ratings = items.map(line => line.review && line.review.rating)
+          .filter(rating => typeof rating === 'number' && Number.isFinite(rating) && rating >= 1 && rating <= 5);
+        return {
+          ...order,
+          ...(reviews ? { rating: ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : null } : {}),
+          items: items.map((line) => {
+            const product = snapshot.products.find((p) => String(p.name).trim() === String(line.productTitle).trim());
+            // `thumbnail`: the menu's own photo path for the food (null when it has none).
+            return {
+              ...line,
+              productId: product ? product.key : null,
+              thumbnail: (product && (product.thumbnail || product.image)) || null,
+            };
+          }),
+        };
+      });
     }
 
     function rawSampleOrders() {
@@ -175,6 +191,10 @@
     }
 
     const user = { id: 'mock-user', first_name: 'کاربر', last_name: 'نمونه', mobile: '09120000000' };
+    // BACKEND: proposed profile.bankCardNumber (§14). Demo memory only, reset on
+    // factory restart; this shared sample is not production customer isolation.
+    // Keep PAN OUT of the login/register user object cached by the frontend.
+    const profile = { name: user.first_name, family: user.last_name, bankCardNumber: null };
     const json = (body, status = 200) => ({ status, body });
     const routes = {
       'GET /api/enduser/core/initialize': () => json(initialize()),
@@ -182,8 +202,22 @@
       'POST /api/auth/check-mobile': () => json({ is_new_user: false, verify_code: '12345' }),
       'POST /api/auth/login': () => json({ token: 'mock-token', user }),
       'POST /api/auth/register': () => json({ token: 'mock-token', user }),
-      'GET /api/enduser/profile': () => json(Object.assign({}, user, { addresses: sampleAddresses() })),
-      'PUT /api/enduser/profile': () => json(user),
+      'GET /api/enduser/profile': () => json(Object.assign({}, user, profile, { addresses: sampleAddresses() })),
+      'PUT /api/enduser/profile': (body) => {
+        if (Object.prototype.hasOwnProperty.call(body, 'bankCardNumber')) {
+          const card = body.bankCardNumber;
+          // The demo accepts only the canonical ASCII contract, with Luhn.
+          if (typeof card !== 'string' || !/^\d{16}$/.test(card) || /^(\d)\1{15}$/.test(card) ||
+              [...card].reduce((sum, digit, i) => {
+                const part = Number(digit) * (i % 2 === 0 ? 2 : 1);
+                return sum + (part > 9 ? part - 9 : part);
+              }, 0) % 10 !== 0) return json({ message: 'شماره کارت معتبر نیست.' }, 400);
+          profile.bankCardNumber = card;
+        }
+        if (typeof body.name === 'string') profile.name = body.name;
+        if (typeof body.family === 'string') profile.family = body.family;
+        return json({ ok: true });
+      },
       'GET /api/enduser/profile/addresses': () => json(sampleAddresses()),
       'GET /api/enduser/profile/orders': () => json(sampleOrders()),
       // The order still being prepared (the first sample), so the "active order"
@@ -198,18 +232,17 @@
       'GET /api/enduser/profile/password-status': () => json({ hasPassword: false }),
       'GET /api/enduser/profile/discount-codes': () => json({ available: sampleCodes, used: usedCodes }),
       'GET /api/enduser/profile/active-discount-codes': () => json(sampleCodes),
-      // Messages from the restaurant. Two answers from management to reviews the
-      // customer wrote (type 'review_reply', see the contract at the top of
-      // pages/profile/components/notificationList.vue): one not yet seen, one
-      // already read and acknowledged.
+      // Local-only samples using the existing message contract: one unread
+      // management message for the homepage demo, and one read review reply.
+      // Read state lives in this mock factory until the local API is restarted.
       'GET /api/enduser/profile/notifications': () => {
         const hoursAgo = (h) => new Date(Date.now() - h * 36e5).toISOString();
         const items = [
           {
-            id: 'n-1', type: 'review_reply', title: 'پاسخ مدیریت به نظر شما',
-            body: 'از لطف و وقتی که گذاشتید سپاسگزاریم. موضوع دیر رسیدن برنج را با آشپزخانه در میان گذاشتیم و در سفارش‌های بعدی دقت بیشتری خواهیم کرد. امیدواریم به‌زودی دوباره میزبان شما باشیم.',
-            createDate: hoursAgo(3), seenDate: null, ackDate: null, linkUrl: null,
-            data: { productTitle: 'چلو وزیری', rating: 4, comment: 'خوب بود، فقط برنج کمی دیر رسید.', orderNumber: '10431' },
+            id: 'n-1', type: null, title: 'پیام آزمایشی مدیریت رستوران لاویز',
+            body: 'سلام دوست عزیز لاویز! به بخش پیام‌های رستوران خوش آمدید. از این پس اطلاع‌رسانی‌های مدیریت و پاسخ نظرهای شما را اینجا می‌بینید. این پیام نمونه فقط برای نمایش قابلیت پیام جدید در نسخهٔ محلی است.',
+            createDate: hoursAgo(1), seenDate: notificationSeenDates.get('n-1') || null, ackDate: null, linkUrl: null,
+            data: null,
           },
           {
             id: 'n-2', type: 'review_reply', title: 'پاسخ مدیریت به نظر شما',
@@ -220,7 +253,10 @@
         ];
         return json({ items, unseenCount: items.filter((n) => !n.seenDate).length });
       },
-      'PUT /api/enduser/profile/notifications/seen': () => json({ ok: true }),
+      'PUT /api/enduser/profile/notifications/seen': (body) => {
+        (body.ids || []).forEach(id => notificationSeenDates.set(id, new Date().toISOString()));
+        return json({ ok: true });
+      },
       'POST /api/enduser/order/preview': (body) => {
         let total = 0;
         (body.products || []).forEach((i) => {
@@ -251,11 +287,26 @@
       }
       // GET/POST /api/enduser/profile/orders/{id}/review: the lines of an order
       // that can be rated, and saving the ratings. Only delivered orders are
-      // rateable, like the real API; saving is accepted and not stored.
+      // rateable. BACKEND: §5, persist existing ratings/comment fields and return
+      // them in both GETs; real API read-after-write support must be verified.
       const rv = pathname.match(/^\/api\/enduser\/profile\/orders\/([^/]+)\/review$/);
       if (rv && (method === 'GET' || method === 'POST')) {
-        if (method === 'POST') return json({ ok: true });
         const order = sampleOrders().find((o) => o.id === decodeURIComponent(rv[1]));
+        if (method === 'POST') {
+          if (!order || ![4, 20].includes(order.status)) return json({ message: 'سفارش قابل امتیازدهی نیست.' }, 400);
+          const ratings = body && body.ratings;
+          // Validate the whole batch before mutation so a rejected POST changes nothing.
+          if (!Array.isArray(ratings) || !ratings.length || ratings.some(entry =>
+            !entry || !order.items.some(line => line.id === entry.productId) ||
+            typeof entry.rating !== 'number' || !Number.isFinite(entry.rating) || entry.rating < 1 || entry.rating > 5 ||
+            (entry.comment != null && typeof entry.comment !== 'string'))) {
+            return json({ message: 'امتیاز معتبر نیست.' }, 400);
+          }
+          const reviews = savedReviews.get(order.id) || new Map();
+          ratings.forEach(entry => reviews.set(entry.productId, { rating: entry.rating, comment: (entry.comment || '').trim() }));
+          savedReviews.set(order.id, reviews);
+          return json({ ok: true });
+        }
         return json({
           rateable: !!order && [4, 20].includes(order.status),
           // Like the real API will: each line carries the product's `thumbnail`

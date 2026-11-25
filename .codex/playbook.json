@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "project": "Lovizefood",
+  "lane": "single",
+  "task_plan": "docs/task-plan.md",
+  "handoff": "",
+  "reuse_agent_guard": false,
+  "forbidden": [],
+  "guarded": [
+    "AGENTS.md",
+    ".codex/**",
+    "CLAUDE.md",
+    "package.json",
+    "pnpm-lock.yaml",
+    ".github/**",
+    "scripts/**"
+  ],
+  "task_overrides": {
+    "RESTAURANT-OTP-TEST-POLISH": { "critical": true },
+    "RESTAURANT-PHONE-MODAL-FIX": { "critical": true },
+    "RESTAURANT-CHECKOUT-EXACT": { "critical": true },
+    "IMMERSIVE-KIOSK-FOLLOWUP": { "critical": true },
+    "REFUND-CARD": { "critical": true },
+    "IMMERSIVE-CONTRACT": { "critical": true },
+    "IMMERSIVE-CART-CORE": { "critical": true },
+    "IMMERSIVE-CART-WIRE": { "critical": true },
+    "IMMERSIVE-RESTAURANT": { "critical": true },
+    "IMMERSIVE-SECURITY-Q": { "critical": true }
+  },
+  "critical_task_patterns": [],
+  "model_policy_version": 2,
+  "forbidden_model_patterns": [
+    "*astra*"
+  ]
+}

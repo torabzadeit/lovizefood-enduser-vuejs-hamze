@@ -1,6 +1,7 @@
 export default {
   // Disable server-side rendering: https://go.nuxtjs.dev/ssr-mode
   ssr: false,
+  loadingIndicator: { name: '~/components/boot-skeleton.html' },
 
   // Target: https://go.nuxtjs.dev/config-target
   target: 'server',
@@ -54,6 +55,11 @@ export default {
     // axios.js was present but never registered here, so its error handling
     // (notably clearing a dead token on 401) never ran.
     "~/plugins/axios",
+    ...(process.env.NODE_ENV !== 'production' ? [{ src: '~/plugins/restaurant-mock', mode: 'client' }] : []),
+    // LOCAL ONLY: remove this hook before committing; preview code is git-ignored.
+    ...(process.env.NODE_ENV !== 'production' && require('fs').existsSync(require('path').resolve(__dirname, '.local-dev/plugin.js'))
+      ? [{ src: require('path').resolve(__dirname, '.local-dev/plugin.js'), mode: 'client' }]
+      : []),
   ],
 
   serverMiddleware: [

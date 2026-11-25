@@ -1,0 +1,52 @@
+<style>
+  #nuxt-loading { --boot-bg: #fff; --boot-surface: #fff; --boot-fill: #ebe5df; --boot-line: #eee8e1; min-height: 100vh; background: var(--boot-bg); direction: rtl; }
+  html[data-theme="dark"] #nuxt-loading { --boot-bg: #17181a; --boot-surface: #17181a; --boot-fill: #363639; --boot-line: #303033; }
+  #nuxt-loading * { box-sizing: border-box; }
+  .boot-shell { max-width: 720px; margin: auto; background: var(--boot-surface); min-height: 100vh; }
+  .boot-top { height: 88px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+  .boot-actions, .boot-tabs { display: flex; gap: 12px; align-items: center; }
+  .boot-block { background: var(--boot-fill); border-radius: 8px; }
+  .boot-logo { width: 96px; height: 32px; }
+  .boot-action { width: 36px; height: 36px; border-radius: 50%; }
+  .boot-tabs { height: 48px; padding: 0 20px; border-bottom: 1px solid var(--boot-line); overflow: hidden; }
+  .boot-tab { flex: 0 0 70px; height: 16px; }
+  .boot-menu { padding: 20px 16px; }
+  .boot-title { width: 110px; height: 22px; margin: 8px 0 18px; }
+  .boot-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--boot-line); }
+  .boot-copy { flex: 1; padding-top: 6px; }
+  .boot-copy .boot-block { height: 14px; margin-bottom: 12px; }
+  .boot-copy .boot-block:first-child { width: 70%; height: 18px; }
+  .boot-copy .boot-block:nth-child(2) { width: 90%; }
+  .boot-copy .boot-block:last-child { width: 45%; }
+  .boot-photo { width: 104px; height: 104px; flex: none; border-radius: 12px; }
+  .boot-error { padding: 24px; text-align: center; color: #56332a; font: 16px sans-serif; }
+  html[data-theme="dark"] .boot-error { color: #f4e8db; }
+  .boot-error button { cursor: pointer; padding: 10px 20px; font: inherit; }
+</style>
+<script>
+  window.addEventListener('error', function (event) {
+    var source = event.target && event.target.tagName === 'SCRIPT' ? event.target.src : event.filename;
+    if (!source || source.indexOf('/_nuxt/') === -1) return;
+    var loading = document.getElementById('nuxt-loading');
+    var error = document.getElementById('boot-error');
+    if (loading && error) {
+      loading.setAttribute('aria-busy', 'false');
+      loading.setAttribute('aria-label', 'خطا در بارگذاری برنامه');
+      error.hidden = false;
+    }
+  }, true);
+</script>
+<div id="nuxt-loading" role="status" aria-label="در حال بارگذاری منو" aria-busy="true">
+  <div id="boot-error" class="boot-error" role="alert" hidden>برنامه بارگذاری نشد. لطفاً صفحه را دوباره بارگذاری کنید. <button type="button" onclick="location.reload()">بارگذاری دوباره</button></div>
+  <div class="boot-shell" aria-hidden="true">
+    <div class="boot-top"><div class="boot-block boot-logo"></div><div class="boot-actions"><div class="boot-block boot-action"></div><div class="boot-block boot-action"></div><div class="boot-block boot-action"></div></div></div>
+    <div class="boot-tabs"><div class="boot-block boot-tab"></div><div class="boot-block boot-tab"></div><div class="boot-block boot-tab"></div><div class="boot-block boot-tab"></div></div>
+    <div class="boot-menu">
+      <div class="boot-block boot-title"></div>
+      <div class="boot-row"><div class="boot-copy"><div class="boot-block"></div><div class="boot-block"></div><div class="boot-block"></div></div><div class="boot-block boot-photo"></div></div>
+      <div class="boot-row"><div class="boot-copy"><div class="boot-block"></div><div class="boot-block"></div><div class="boot-block"></div></div><div class="boot-block boot-photo"></div></div>
+      <div class="boot-row"><div class="boot-copy"><div class="boot-block"></div><div class="boot-block"></div><div class="boot-block"></div></div><div class="boot-block boot-photo"></div></div>
+      <div class="boot-row"><div class="boot-copy"><div class="boot-block"></div><div class="boot-block"></div><div class="boot-block"></div></div><div class="boot-block boot-photo"></div></div>
+    </div>
+  </div>
+</div>

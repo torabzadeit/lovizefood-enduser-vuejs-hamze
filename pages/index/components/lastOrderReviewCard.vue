@@ -2,7 +2,7 @@
   <!--
     The last delivered order, offered for a review at the top of the first page.
     It is a prompt, not an order list: the title says what happened, the card
-    shows just enough to recognise the order (number, when it arrived, what was
+    shows just enough to recognise the order (registration date, what was
     in it, the total once), and the review is one tap away: a row of stars that
     opens the review sheet with that rating already chosen, or the main button.
     The receipt stays as a quiet second action.
@@ -16,7 +16,7 @@
         </svg>
       </span>
       <div class="lorc__head-text">
-        <h2 id="lorc-title" class="lorc__title">آخرین سفارش شما تحویل شد</h2>
+        <h2 id="lorc-title" class="lorc__title">سفارش شما تحویل شد</h2>
         <p class="lorc__hint">با ثبت نظر، به بهبود کیفیت ما کمک کنید.</p>
       </div>
       <button type="button" class="lorc__close" aria-label="بستن" @click="$emit('dismiss')">
@@ -28,7 +28,6 @@
 
       <div class="lorc__top">
         <div class="lorc__who">
-          <p class="lorc__no">سفارش {{ number }}</p>
           <p v-if="orderDate" class="lorc__meta">{{ orderDate }}</p>
         </div>
         <span class="lorc__chip">
@@ -53,18 +52,19 @@
 
       <div class="lorc__rate" role="group" aria-label="امتیاز شما به این سفارش">
         <span class="lorc__rate-label">امتیاز شما</span>
-        <span class="lorc__stars">
+        <span class="lorc__stars" dir="ltr">
           <button
             v-for="star in 5"
             :key="star"
             type="button"
             class="lorc__star"
-            :aria-label="star + ' ستاره'"
+            :aria-label="faDigits(star) + ' ستاره'"
             @click="$emit('review', order, star)"
           >
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true" focusable="false">
               <path d="M12 3.6l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 17l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8z" />
             </svg>
+            <span class="lorc__star-number" aria-hidden="true">{{ faDigits(star) }}</span>
           </button>
         </span>
       </div>
@@ -100,9 +100,6 @@ export default {
     downloading: { type: Boolean, default: false },
   },
   computed: {
-    number() {
-      return this.order.orderNumber || String(this.order.id || '').slice(0, 8);
-    },
     // "تاریخ ثبت سفارش: سه‌شنبه ۱۸ آبان ۱۴۰۵": the one date an order card shows. The
     // delivery date and time are not shown.
     orderDate() {
@@ -122,6 +119,7 @@ export default {
     },
   },
   methods: {
+    faDigits,
     money(value) {
       return Number(value || 0).toLocaleString('fa-IR');
     },
@@ -207,15 +205,8 @@ export default {
   gap: var(--lz-space-3);
 }
 
-.lorc__no {
-  margin: 0;
-  font-size: var(--lz-text-body);
-  font-weight: var(--lz-weight-semibold);
-  color: var(--lz-ink);
-}
-
 .lorc__meta {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: var(--lz-text-sm);
   color: var(--lz-ink-muted);
 }
@@ -288,12 +279,13 @@ export default {
   color: var(--lz-ink);
 }
 
-.lorc__stars { display: inline-flex; }
+.lorc__stars { display: inline-flex; flex-direction: row; }
 
 .lorc__star {
-  width: 40px;
+  width: 44px;
   height: 44px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -304,6 +296,8 @@ export default {
   cursor: pointer;
   transition: transform 0.12s ease;
 }
+
+.lorc__star-number { font-size: 11px; line-height: 1; color: var(--lz-ink-muted); }
 
 .lorc__star:active { transform: scale(0.85); }
 
